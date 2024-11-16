@@ -1,0 +1,11 @@
+[package]
+name = "pokedex-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7.7"
+config = "0.14.1"
+tokio = { version = "1.41.1", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
