@@ -22,13 +22,6 @@ impl Display for Service {
     }
 }
 
-#[derive(Insertable)]
-#[diesel(table_name = crate::schema::Services)]
-pub struct NewService<'a> {
-    pub name: &'a str,
-    pub password: &'a str,
-}
-
 #[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crate::schema::ServiceUnits)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
