@@ -41,7 +41,9 @@ fn main() {
                         .load(pg_conn)
                         .unwrap();
 
-                    println!("{:?}", results);
+                    for result in results {
+                        println!("{}", result);
+                    }
                 }
                 ServiceCommands::Create {
                     name: service_name,

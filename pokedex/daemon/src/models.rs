@@ -28,3 +28,22 @@ pub struct NewService<'a> {
     pub name: &'a str,
     pub password: &'a str,
 }
+
+#[derive(Queryable, Selectable, Debug)]
+#[diesel(table_name = crate::schema::ServiceUnits)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct ServiceUnit {
+    pub id: String,
+    pub service_id: i32,
+    pub address: Option<String>,
+    pub port: Option<i32>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::ServiceUnits)]
+pub struct NewServiceUnit<'a> {
+    pub id: &'a str,
+    pub service_id: i32,
+    pub address: Option<&'a str>,
+    pub port: Option<i32>,
+}

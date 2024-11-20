@@ -5,6 +5,37 @@ info:
   version: "0.1.0"
 
 paths:
+  /query:
+    get:
+      summary: "Get information about an IP address"
+      parameters:
+        - name: address
+          in: "query"
+          schema:
+            type: string
+      responses:
+        200:
+          description: "IP info"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: string
+                  online:
+                    type: object
+                    properties:
+                      value:
+                        type: boolean
+                      reason:
+                        type: string
+                  rir:
+                    type: string
+                  owner:
+                    type: string
+                  asn:
+                    type: number
   /ping:
     get:
       summary: "Ping the specified IP address and return whether it is online or offline."
@@ -13,7 +44,7 @@ paths:
           in: "query"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         200:
           description: "IP status"
@@ -23,7 +54,12 @@ paths:
                 type: object
                 properties:
                   online:
-                    type: boolean
+                    type: object
+                    properties:
+                      value:
+                        type: boolean
+                      reason:
+                        type: string
         400:
           description: "Malformed IP address specified"
   /health:

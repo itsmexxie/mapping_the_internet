@@ -7,7 +7,7 @@ info:
 paths:
   /auth/login:
     post:
-      summary: "Login using the provided service credentials"
+      summary: "Login using the provided service credentials. Automatically registers the client as a service unit if an IP address and port is specified."
       requestBody:
         description: "Login credentials"
         required: true
@@ -20,6 +20,10 @@ paths:
                   type: string
                 password:
                   type: string
+                address:
+                  type: string
+                port:
+                  type: number
               required:
                 - username
                 - password
@@ -33,7 +37,7 @@ paths:
           description: "Wrong username and/or password"
   /auth/logout:
     post:
-      summary: "Logout using the provided service token"
+      summary: "Logout using the provided service token and deregister the corresponding unit"
       parameters:
         - name: token
           in: header

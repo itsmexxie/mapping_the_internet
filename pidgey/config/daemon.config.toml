@@ -1,0 +1,10 @@
+#[api]
+#port=7010
+
+#[pokedex]
+#address=
+#port=
+
+#[unit]
+#address=
+#reachable= Whether to login as a reachable unit (address required, port is taken from the api setting)
