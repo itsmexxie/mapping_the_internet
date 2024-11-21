@@ -37,9 +37,8 @@ CREATE TABLE "servers"(
 CREATE TABLE "serviceunits"(
 	"id" VARCHAR(36) NOT NULL PRIMARY KEY,
 	"service_id" INT4 NOT NULL,
-	"address" VARCHAR(16),
-	"port" INT4,
-	FOREIGN KEY ("service_id") REFERENCES "Services"("id")
+	"address" INET,
+	"port" INT4
 );
 
 CREATE TABLE "services"(
@@ -48,8 +47,3 @@ CREATE TABLE "services"(
 	"password" VARCHAR(255) NOT NULL
 );
 
-DROP TABLE IF EXISTS "addresstypes";
-DROP TABLE IF EXISTS "serviceunits";
-DROP TABLE IF EXISTS "services";
-DROP TABLE IF EXISTS "addresses";
-DROP TABLE IF EXISTS "types";

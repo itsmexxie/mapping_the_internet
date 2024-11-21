@@ -33,6 +33,8 @@ paths:
       responses:
         200:
           description: "OK"
+        400:
+          description: "Invalid IP address and/or port"
         401:
           description: "Wrong username and/or password"
   /auth/logout:

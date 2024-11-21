@@ -28,7 +28,7 @@ impl Display for Service {
 pub struct ServiceUnit {
     pub id: String,
     pub service_id: i32,
-    pub address: Option<String>,
+    pub address: Option<ipnetwork::IpNetwork>,
     pub port: Option<i32>,
 }
 
@@ -37,6 +37,6 @@ pub struct ServiceUnit {
 pub struct NewServiceUnit<'a> {
     pub id: &'a str,
     pub service_id: i32,
-    pub address: Option<&'a str>,
+    pub address: Option<ipnetwork::IpNetwork>,
     pub port: Option<i32>,
 }
