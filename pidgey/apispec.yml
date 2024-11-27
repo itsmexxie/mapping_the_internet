@@ -1,0 +1,78 @@
+openapi: 3.0.0
+info:
+  title: "Pidgey API"
+  description: "A service that gathers information about an IPv4 address"
+  version: "0.1.0"
+
+paths:
+  /query:
+    get:
+      summary: "Get information about an IP address"
+      parameters:
+        - name: address
+          in: "query"
+          schema:
+            type: string
+      responses:
+        200:
+          description: "IP info"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - state
+                  - online
+                properties:
+                  state:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                      reason:
+                        type: string
+                  online:
+                    type: object
+                    properties:
+                      value:
+                        type: boolean
+                      reason:
+                        type: string
+                  rir:
+                    type: string
+                  asn:
+                    type: number
+        400:
+          description: "Malformed IP address specified"
+  /query/online:
+    get:
+      summary: "Ping the specified IP address and return whether it is online or offline."
+      parameters:
+        - name: address
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: "IP status"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  online:
+                    type: object
+                    properties:
+                      value:
+                        type: boolean
+                      reason:
+                        type: string
+        400:
+          description: "Malformed IP address specified"
+  /health:
+    get:
+      summary: "Health status"
+      responses:
+        200:
+          description: "OK"

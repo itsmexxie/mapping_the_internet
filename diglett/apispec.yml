@@ -1,0 +1,40 @@
+openapi: 3.0.0
+info:
+  title: "Diglett API"
+  description: "A service that provides a nice HTTP abstraction over services that provide address information via text files."
+  version: "0.1.0"
+
+paths:
+  /rir:
+    get:
+      summary: "Get the RIR for the specified address"
+      parameters:
+        - name: address
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: "RIR name (one of ARIN, RIPE NCC, APNIC, LACNIC, AfriNIC)"
+  /asn:
+    get:
+      summary: "Get the ASN for the specified IP address"
+      parameters:
+        - name: address
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: "AS number"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  asn:
+                    type: number
+        400:
+          description: "Bad IP address"
+        404:
+          description: "No ASN was found"

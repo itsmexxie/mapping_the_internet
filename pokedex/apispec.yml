@@ -1,0 +1,73 @@
+openapi: 3.0.0
+info:
+  title: "Pokedex API"
+  description: "A service list and authentication provider for the MTI project. In short, a service provides some sort of mechanism (e.g. looking up ip addresses, serving websites, etc.), while a unit is a specific instance of the service server. Clients should at first lookup available units for the wanted service and then ping the specific unit (excluding crawlers, which should be managed and invoked via the orchestrator)."
+  version: "0.1.0"
+
+paths:
+  /auth/login:
+    post:
+      summary: "Login using the provided service credentials. Automatically registers the client as a service unit if an IP address and port is specified."
+      requestBody:
+        description: "Login credentials"
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                address:
+                  type: string
+                port:
+                  type: number
+              required:
+                - username
+                - password
+            example:
+              username: crawler
+              password: averysecurepassword
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Invalid IP address and/or port"
+        401:
+          description: "Wrong username and/or password"
+        403:
+          description: "The service has max_one set to true and there is already a unit running somewhere"
+  /auth/logout:
+    post:
+      summary: "Logout using the provided service token and deregister the corresponding unit"
+      parameters:
+        - name: token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: "OK"
+        401:
+          description: "No or invalid service token provided"
+  /services:
+    get:
+      summary: "Returns a list of defined services"
+      responses:
+        200:
+          description: "A list of services"
+  /services/{id}:
+    get:
+      summary: "Returns the specified service"
+      responses:
+        200:
+          description: "Service object, including available units"
+  /services/{id}/units:
+    get:
+      summary: "Returns the available units for the specified service type"
+      responses:
+        200:
+          description: "Unit list for the specified service type"
