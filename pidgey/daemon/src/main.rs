@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use config::Config;
+use diglett::Diglett;
 use mtilib::pokedex::{PokedexConfig, PokedexUnitConfig};
-use serde::Serialize;
-use tokio::signal;
+use tokio::{signal, sync::Semaphore};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
@@ -11,15 +11,9 @@ use tracing::{error, info};
 extern crate concat_string;
 
 pub mod api;
+pub mod diglett;
+pub mod gust;
 pub mod pidgeotto;
-
-#[derive(Serialize)]
-struct ApiServiceUnit {
-    id: String,
-    service_id: i32,
-    address: Option<String>,
-    port: Option<i32>,
-}
 
 #[tokio::main]
 async fn main() {
@@ -55,20 +49,49 @@ async fn main() {
         Err(error) => return error!(error),
     };
 
+    // Services setup
+    let diglett = Arc::new(Diglett::new(&config, &pokedex_config).await);
+
     // Tokio setup
     let task_tracker = TaskTracker::new();
     let task_token = CancellationToken::new();
 
+    let worker_permits = Arc::new(Semaphore::new(
+        config.get_int("settings.max_workers").unwrap_or(16) as usize,
+    ));
+
+    // Graceful shutdown with cleanup
+    let signal_task_tracker = task_tracker.clone();
+    let signal_task_token = task_token.clone();
+    tokio::spawn(async move {
+        match signal::ctrl_c().await {
+            Ok(_) => {
+                // Logout of Pokedex
+                mtilib::pokedex::logout(&pokedex_config, &jwt).await;
+                info!("Successfully logged out of Pokedex!");
+
+                // Cancel all tasks
+                signal_task_tracker.close();
+                signal_task_token.cancel();
+            }
+            Err(err) => {
+                error!("Unable to listen for shutdown signal: {}", err);
+            }
+        }
+    });
+
     // Axum API task
     let axum_task_token = task_token.clone();
     let axum_config = config.clone();
+    let axum_worker_permits = worker_permits.clone();
+    let axum_diglett = diglett.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(axum_config) => {
+            () = api::run(axum_config, axum_worker_permits, axum_diglett) => {
                 info!("Axum API task exited on its own!");
             },
             () = axum_task_token.cancelled() => {
-                info!("API task cancelled succesfully!");
+                info!("Axum API task cancelled succesfully!");
             }
         }
     });
@@ -83,25 +106,6 @@ async fn main() {
             }
             () = pidgeotto_task_token.cancelled() => {
                 info!("Pidgeotto task cancelled succesfully!");
-            }
-        }
-    });
-
-    // Graceful shutdown with cleanup
-    let signal_task_tracker = task_tracker.clone();
-    tokio::spawn(async move {
-        match signal::ctrl_c().await {
-            Ok(_) => {
-                // Logout of Pokedex
-                mtilib::pokedex::logout(&pokedex_config, &jwt).await;
-                info!("Successfully logged out of Pokedex!");
-
-                // Cancel all tasks
-                signal_task_tracker.close();
-                task_token.cancel();
-            }
-            Err(err) => {
-                error!("Unable to listen for shutdown signal: {}", err);
             }
         }
     });

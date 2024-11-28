@@ -56,7 +56,7 @@ async fn main() {
             "true" | "t" | "1" => {
                 Some(config.get_int("api.port").expect("api.port must be set!") as i32)
             }
-            "false" | "f" | "0" | _ => None,
+            _ => None,
         },
         Err(_) => None,
     };

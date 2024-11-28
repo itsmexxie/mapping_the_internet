@@ -1,5 +1,8 @@
 # https://kerkour.com/rust-small-docker-image#from-alpine
 # https://www.codefeetime.com/post/docker-config-for-actix-web-diesel-and-postgres/
+
+# Must be ran from ../
+
 #############
 ## Builder ##
 #############
@@ -8,7 +11,8 @@ FROM rust:latest AS builder
 RUN apt update
 
 WORKDIR /diglett
-COPY ./ .
+COPY ./diglett .
+COPY ./lib /lib
 
 RUN cargo build --release
 

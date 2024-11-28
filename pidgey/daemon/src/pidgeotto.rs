@@ -2,8 +2,14 @@ use std::sync::Arc;
 
 use config::Config;
 use tokio_tungstenite::connect_async;
+use tracing::info;
 
 pub async fn run(config: Arc<Config>) {
+    if !config.get_bool("pidgeotto.connect").unwrap() {
+        info!("pidgeotto.connect set to false, not connecting!");
+        return;
+    }
+
     let pidgeotto_address = config
         .get_string("pidgeotto.address")
         .expect("pidgeotto.address must be set!");
