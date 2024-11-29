@@ -69,7 +69,7 @@ impl Diglett {
             i += 1;
         }
 
-        panic!("Failed to create Diglett, no running instances found!");
+        panic!("Failed to create Diglett client, no running instances found!");
     }
 
     pub async fn rir(&self, address: Ipv4Addr) -> Option<String> {

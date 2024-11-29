@@ -38,12 +38,10 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     info!("Loading RIR allocations...");
 
     let rir_allocations_filepath_cnf =
-        &get_config_value::<String>(config, "thyme.rir.allocations.filepath");
+        &get_config_value::<String>(config, "providers.thyme.rir_allocations.filepath");
     let rir_allocations_filepath = Path::new(rir_allocations_filepath_cnf);
 
-    let mut file: File = File::open(Path::new(rir_allocations_filepath))
-        .await
-        .unwrap();
+    let mut file: File = File::open(rir_allocations_filepath).await.unwrap();
     let mut contents_str = String::new();
     file.read_to_string(&mut contents_str).await.unwrap();
 

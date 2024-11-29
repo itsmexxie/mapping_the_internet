@@ -2,12 +2,12 @@ use std::{fmt::Display, path::Path, str::FromStr, u32};
 
 use config::Config;
 use regex::Regex;
-use tokio::{fs, io::AsyncReadExt};
+use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
 use crate::{get_config_value, utils::CIDR};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AsnPrefixEntry {
     pub prefix: CIDR,
     pub asn: u32,
@@ -38,12 +38,10 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     info!("Loading ASN prefixes...");
 
     let asn_prefixes_filepath_cnf =
-        &get_config_value::<String>(config, "thyme.asn.prefixes.filepath");
+        &get_config_value::<String>(config, "providers.thyme.asn_prefixes.filepath");
     let asn_prefixes_filepath = Path::new(asn_prefixes_filepath_cnf);
 
-    let mut file: fs::File = tokio::fs::File::open(Path::new(asn_prefixes_filepath))
-        .await
-        .unwrap();
+    let mut file = File::open(asn_prefixes_filepath).await.unwrap();
     let mut contents_str = String::new();
     file.read_to_string(&mut contents_str).await.unwrap();
 

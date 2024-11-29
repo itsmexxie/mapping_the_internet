@@ -7,10 +7,15 @@ use tokio::{
 };
 use tracing::{error, info};
 
-pub mod asn_prefixes;
-// pub mod rir_allocations;
+pub mod arin;
+pub mod thyme;
 
 use crate::get_config_value;
+
+pub struct Providers {
+    pub arin: arin::Providers,
+    pub thyme: thyme::Providers,
+}
 
 pub async fn download_file(config: &Config, section: &str) {
     let url = get_config_value::<String>(config, &concat_string!(section, ".url"));

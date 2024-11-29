@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use config::Config;
 use mtilib::pokedex::{PokedexConfig, PokedexUnitConfig};
+use providers::arin;
 use serde::Deserialize;
-use tokio::signal;
+use tokio::{signal, sync::RwLock};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 pub mod api;
-pub mod thyme;
+pub mod providers;
 pub mod utils;
 
 #[macro_use(concat_string)]
@@ -97,23 +98,38 @@ async fn main() {
     });
 
     // Load files
-    if !thyme::check_file(&config, "thyme.asn.prefixes").await {
-        thyme::download_file(&config, "thyme.asn.prefixes").await;
+    let sections = [
+        "arin.stats.arin",
+        "arin.stats.ripencc",
+        "arin.stats.apnic",
+        "arin.stats.lacnic",
+        "arin.stats.afrinic",
+        "thyme.asn_prefixes",
+        "thyme.rir_allocations",
+    ];
+    for section in sections {
+        let section_str = concat_string!("providers.", section);
+        if !providers::check_file(&config, &section_str).await {
+            providers::download_file(&config, &section_str).await;
+        }
     }
-    let asn_prefixes = Arc::new(thyme::asn_prefixes::load(&config).await);
 
-    if !thyme::check_file(&config, "thyme.rir.allocations").await {
-        thyme::download_file(&config, "thyme.rir.allocations").await;
-    }
-    let rir_allocations = Arc::new(thyme::rir_allocations::load(&config).await);
+    let providers = Arc::new(RwLock::new(providers::Providers {
+        arin: providers::arin::Providers {
+            stats: arin::stats::load(&config).await,
+        },
+        thyme: providers::thyme::Providers {
+            asn: providers::thyme::asn_prefixes::load(&config).await,
+            rir: providers::thyme::rir_allocations::load(&config).await,
+        },
+    }));
 
     // Axum API
     let axum_token = task_token.clone();
-    let axum_rir_allocations = rir_allocations.clone();
-    let axum_asn_prefixes = asn_prefixes.clone();
+    let axum_providers = providers.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(config, axum_rir_allocations, axum_asn_prefixes) => {
+            () = api::run(config, axum_providers) => {
                 info!("Axum API task exited on its own!");
             }
             () = axum_token.cancelled() => {

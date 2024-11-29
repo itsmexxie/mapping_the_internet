@@ -7,6 +7,10 @@ pub struct CIDR {
 }
 
 impl CIDR {
+    pub fn new(prefix: u32, mask: u16) -> Self {
+        CIDR { prefix, mask }
+    }
+
     pub fn address_is_in(&self, address: u32) -> bool {
         let mask = u32::MAX << (32 - self.mask);
         (self.prefix & mask) == (address & mask)
