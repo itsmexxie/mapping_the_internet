@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use config::Config;
-use mtilib::types::{AllocationState, Rir};
+use mtilib::types::AllocationState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;

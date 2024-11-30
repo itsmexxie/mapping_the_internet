@@ -4,7 +4,10 @@ use config::Config;
 use mtilib::pokedex::{PokedexConfig, PokedexUnitConfig};
 use providers::{arin, iana, thyme};
 use serde::Deserialize;
-use tokio::{signal, sync::RwLock};
+use tokio::{
+    signal::{self, unix::SignalKind},
+    sync::RwLock,
+};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
@@ -16,7 +19,9 @@ pub mod utils;
 extern crate concat_string;
 
 pub fn get_config_value<T: for<'a> Deserialize<'a>>(config: &Config, id: &str) -> T {
-    config.get::<T>(id).unwrap_or_else(|_| panic!("{} must be set!", id))
+    config
+        .get::<T>(id)
+        .unwrap_or_else(|_| panic!("{} must be set!", id))
 }
 
 #[tokio::main]
@@ -81,8 +86,25 @@ async fn main() {
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
     tokio::spawn(async move {
-        match signal::ctrl_c().await {
-            Ok(_) => {
+        let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
+        tokio::select! {
+            result = signal::ctrl_c() => {
+                match result {
+                    Ok(_) => {
+                        // Logout of Pokedex
+                        mtilib::pokedex::logout(&pokedex_config, &jwt).await;
+                        info!("Successfully logged out of Pokedex!");
+
+                        // Cancel all tasks
+                        signal_task_tracker.close();
+                        signal_task_token.cancel();
+                    }
+                    Err(err) => {
+                        error!("Unable to listen for shutdown signal: {}", err);
+                    }
+                }
+            }
+            _ = sigterm.recv() => {
                 // Logout of Pokedex
                 mtilib::pokedex::logout(&pokedex_config, &jwt).await;
                 info!("Successfully logged out of Pokedex!");
@@ -90,9 +112,6 @@ async fn main() {
                 // Cancel all tasks
                 signal_task_tracker.close();
                 signal_task_token.cancel();
-            }
-            Err(err) => {
-                error!("Unable to listen for shutdown signal: {}", err);
             }
         }
     });
