@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{get_config_value, utils::CIDR};
 
 pub async fn load(config: &Config) -> Vec<CIDR> {
-    info!("Loading IANA reserved blocks...");
+    info!("Loading IANA reserved addresses...");
 
     // Check if we need to redownload file
     crate::providers::check_many_and_download(config, &["iana.reserved"]).await;
@@ -34,7 +34,7 @@ pub async fn load(config: &Config) -> Vec<CIDR> {
     // TODO: Move into its own section (create a new allocation state)
     reserved_blocks.push(CIDR::from_str("224.0.0.0/4").unwrap());
 
-    info!("Loaded IANA reserved blocks!");
+    info!("Loaded IANA reserved addresses!");
     reserved_blocks.sort();
     reserved_blocks
 }

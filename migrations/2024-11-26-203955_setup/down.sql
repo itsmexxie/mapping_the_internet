@@ -19,9 +19,11 @@ CREATE TABLE "addresses"(
 	"allocation_state_comment" VARCHAR(255),
 	"routed" BOOL NOT NULL,
 	"online" BOOL NOT NULL,
-	"rir_id" INT4,
+	"top_rir_id" VARCHAR(16),
+	"rir_id" VARCHAR(16),
 	"asn_id" INT4,
 	FOREIGN KEY ("allocation_state_id") REFERENCES "AddressAllocationStates"("id"),
+	FOREIGN KEY ("top_rir_id") REFERENCES "Rirs"("id"),
 	FOREIGN KEY ("rir_id") REFERENCES "Rirs"("id"),
 	FOREIGN KEY ("asn_id") REFERENCES "Asns"("id")
 );
@@ -31,7 +33,7 @@ CREATE TABLE "asns"(
 );
 
 CREATE TABLE "rirs"(
-	"id" INT4 NOT NULL PRIMARY KEY,
+	"id" VARCHAR(16) NOT NULL PRIMARY KEY,
 	"name" VARCHAR(255) NOT NULL
 );
 

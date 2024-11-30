@@ -24,12 +24,17 @@ paths:
           description: "Bad IP address"
   /rir:
     get:
-      summary: "Get the RIR for the specified address. Looks up the ARIN stat files first, if no record is found then tries to search the IANA allocation file"
+      summary: "Get the RIR for the specified address."
       parameters:
         - $ref: "#/components/parameters/addressParam"
+        - name: top
+          in: query
+          schema:
+            type: boolean
+
       responses:
         200:
-          description: "RIR name (one of ARIN, RIPE NCC, APNIC, LACNIC, AfriNIC) or null if no RIR found"
+          description: "RIR name (one of arin, ripencc, apnic, lacnic, afrinic, other) or unknown if no RIR found"
           content:
             application/json:
               schema:

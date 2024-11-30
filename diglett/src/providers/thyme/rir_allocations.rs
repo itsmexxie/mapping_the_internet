@@ -1,16 +1,17 @@
 use std::{fmt::Display, path::Path, str::FromStr};
 
 use config::Config;
+use mtilib::types::Rir;
 use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
 use crate::{get_config_value, providers, utils::CIDR};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RirAllocationEntry {
     pub cidr: CIDR,
-    pub rir: String,
+    pub rir: Rir,
 }
 
 impl PartialOrd for RirAllocationEntry {
@@ -29,7 +30,9 @@ impl Display for RirAllocationEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
             "address: {}, mask: {}, rir: {}",
-            self.cidr.prefix, self.cidr.mask, self.rir
+            self.cidr.prefix,
+            self.cidr.mask,
+            self.rir.to_string()
         ))
     }
 }
@@ -57,7 +60,7 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
         let parsed_cidr = CIDR::from_str(prefix).unwrap();
         rir_allocations.push(RirAllocationEntry {
             cidr: parsed_cidr,
-            rir: rir.to_string(),
+            rir: Rir::from_str(rir).unwrap(),
         });
     }
 
@@ -78,12 +81,12 @@ mod tests {
     fn test_rir_allocation_entry_ord() {
         let entry_a = RirAllocationEntry {
             cidr: CIDR::from_str("1.0.0.0/8").unwrap(),
-            rir: "APNIC".to_string(),
+            rir: mtilib::types::Rir::Apnic,
         };
 
         let entry_b = RirAllocationEntry {
             cidr: CIDR::from_str("1.1.1.1/32").unwrap(),
-            rir: "APNIC".to_string(),
+            rir: mtilib::types::Rir::Apnic,
         };
 
         let mut list = vec![entry_a.clone(), entry_b.clone()];

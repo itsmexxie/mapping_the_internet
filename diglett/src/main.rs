@@ -122,6 +122,7 @@ async fn main() {
             stats: arin::stats::load(&config).await,
         },
         iana: iana::Providers {
+            recovered: iana::recovered::load(&config).await,
             reserved: iana::reserved::load(&config).await,
         },
         thyme: thyme::Providers {

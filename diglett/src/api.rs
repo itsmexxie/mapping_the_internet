@@ -5,13 +5,13 @@ use std::{
 };
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
     Json, Router,
 };
 use config::Config;
-use mtilib::types::AllocationState;
+use mtilib::types::{AllocationState, Rir};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
@@ -38,17 +38,17 @@ struct AllocationResponse {
 }
 
 async fn get_allocation(
-    Query(query): Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<AllocationResponse>, StatusCode> {
-    match Ipv4Addr::from_str(query.address.trim()) {
+    match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
             for entry in state.providers.read().await.iana.reserved.iter() {
                 if entry.address_is_in(address_bits) {
                     return Ok(Json(AllocationResponse {
-                        value: AllocationState::Reserved.to_string(),
+                        value: AllocationState::Reserved.id(),
                     }));
                 }
             }
@@ -56,56 +56,77 @@ async fn get_allocation(
             for entry in state.providers.read().await.arin.stats.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(AllocationResponse {
-                        value: entry.allocation_state.to_string(),
+                        value: entry.allocation_state.id(),
                     }));
                 }
             }
 
             Ok(Json(AllocationResponse {
-                value: AllocationState::Unknown.to_string(),
+                value: AllocationState::Unknown.id(),
             }))
         }
         Err(_) => Err(StatusCode::BAD_REQUEST),
     }
 }
 
+#[derive(Deserialize)]
+struct RirQuery {
+    #[serde(default)]
+    top: bool,
+}
+
 async fn get_rir(
-    Query(query): Query<AddressQuery>,
+    Path(address): Path<String>,
+    Query(query): Query<RirQuery>,
     State(state): State<AppState>,
-) -> Result<Json<ValueResponse<Option<String>>>, StatusCode> {
-    match Ipv4Addr::from_str(query.address.trim()) {
+) -> Result<Json<ValueResponse<String>>, StatusCode> {
+    match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            // First look up the ARIN stat files
-            for entry in state.providers.read().await.arin.stats.iter() {
-                if entry.cidr.address_is_in(address_bits) {
-                    return Ok(Json(ValueResponse {
-                        value: Some(entry.rir.to_string()),
-                    }));
+            if query.top {
+                // Use thyme allocations as top
+                for entry in state.providers.read().await.thyme.rir.iter() {
+                    if entry.cidr.address_is_in(address_bits) {
+                        return Ok(Json(ValueResponse {
+                            value: entry.rir.id(),
+                        }));
+                    }
+                }
+            } else {
+                // First look up the IANA recovered addresses
+                for entry in state.providers.read().await.iana.recovered.iter() {
+                    if address_bits >= entry.start.to_bits() && address_bits <= entry.end.to_bits()
+                    {
+                        return Ok(Json(ValueResponse {
+                            value: entry.rir.id(),
+                        }));
+                    }
+                }
+
+                // Then look up the ARIN stat files
+                for entry in state.providers.read().await.arin.stats.iter() {
+                    if entry.cidr.address_is_in(address_bits) {
+                        return Ok(Json(ValueResponse {
+                            value: entry.rir.id(),
+                        }));
+                    }
                 }
             }
 
-            // Use thyme allocations as fallback
-            for entry in state.providers.read().await.thyme.rir.iter() {
-                if entry.cidr.address_is_in(address_bits) {
-                    return Ok(Json(ValueResponse {
-                        value: Some(entry.rir.to_string()),
-                    }));
-                }
-            }
-
-            Ok(Json(ValueResponse { value: None }))
+            Ok(Json(ValueResponse {
+                value: Rir::Unknown.id(),
+            }))
         }
         Err(_) => Err(StatusCode::BAD_REQUEST),
     }
 }
 
 async fn get_asn(
-    Query(query): Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ValueResponse<Option<u32>>>, StatusCode> {
-    match Ipv4Addr::from_str(query.address.trim()) {
+    match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
@@ -124,10 +145,10 @@ async fn get_asn(
 }
 
 async fn get_country(
-    Query(query): Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ValueResponse<Option<String>>>, StatusCode> {
-    match Ipv4Addr::from_str(query.address.trim()) {
+    match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
@@ -159,10 +180,10 @@ pub async fn run(config: Config, providers: Arc<RwLock<providers::Providers>>) {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/allocation", get(get_allocation))
-        .route("/rir", get(get_rir))
-        .route("/asn", get(get_asn))
-        .route("/country", get(get_country))
+        .route("/:address/allocation", get(get_allocation))
+        .route("/:address/rir", get(get_rir))
+        .route("/:address/asn", get(get_asn))
+        .route("/:address/country", get(get_country))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
     let app_port = config.get("api.port").unwrap();
