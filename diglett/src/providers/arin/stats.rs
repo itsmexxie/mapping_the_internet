@@ -5,7 +5,7 @@ use mtilib::types::{AllocationState, Rir};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{get_config_value, utils::CIDR};
+use crate::{get_config_value, providers, utils::CIDR};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StatEntry {
@@ -17,13 +17,13 @@ pub struct StatEntry {
 
 impl PartialOrd for StatEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.cidr.mask.partial_cmp(&self.cidr.mask)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for StatEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cidr.mask.cmp(&self.cidr.mask)
+        other.cidr.cmp(&self.cidr)
     }
 }
 
@@ -50,7 +50,7 @@ pub async fn load(config: &Config) -> Vec<StatEntry> {
         "arin.stats.lacnic",
         "arin.stats.afrinic",
     ];
-    crate::providers::check_many_and_download(config, &sections).await;
+    providers::check_many_and_download(config, &sections).await;
 
     let mut stat_entries = Vec::new();
 

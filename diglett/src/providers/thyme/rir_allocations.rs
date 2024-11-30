@@ -5,23 +5,23 @@ use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{get_config_value, utils::CIDR};
+use crate::{get_config_value, providers, utils::CIDR};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RirAllocationEntry {
-    pub prefix: CIDR,
+    pub cidr: CIDR,
     pub rir: String,
 }
 
 impl PartialOrd for RirAllocationEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.prefix.mask.partial_cmp(&self.prefix.mask)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for RirAllocationEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.prefix.mask.cmp(&self.prefix.mask)
+        other.cidr.cmp(&self.cidr)
     }
 }
 
@@ -29,7 +29,7 @@ impl Display for RirAllocationEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
             "address: {}, mask: {}, rir: {}",
-            self.prefix.prefix, self.prefix.mask, self.rir
+            self.cidr.prefix, self.cidr.mask, self.rir
         ))
     }
 }
@@ -38,7 +38,7 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     info!("Loading RIR allocations...");
 
     // Check if we need to redownload file
-    crate::providers::check_many_and_download(config, &["thyme.rir_allocations"]).await;
+    providers::check_many_and_download(config, &["thyme.rir_allocations"]).await;
 
     // Get the configured filepath and read the file into memory
     let rir_allocations_filepath_cnf =
@@ -56,7 +56,7 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     for (_, [prefix, rir]) in re.captures_iter(&contents_str).map(|c| c.extract()) {
         let parsed_cidr = CIDR::from_str(prefix).unwrap();
         rir_allocations.push(RirAllocationEntry {
-            prefix: parsed_cidr,
+            cidr: parsed_cidr,
             rir: rir.to_string(),
         });
     }
@@ -64,4 +64,30 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     info!("Loaded RIR allocations!");
     rir_allocations.sort();
     rir_allocations
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use crate::utils::CIDR;
+
+    use super::RirAllocationEntry;
+
+    #[test]
+    fn test_rir_allocation_entry_ord() {
+        let entry_a = RirAllocationEntry {
+            cidr: CIDR::from_str("1.0.0.0/8").unwrap(),
+            rir: "APNIC".to_string(),
+        };
+
+        let entry_b = RirAllocationEntry {
+            cidr: CIDR::from_str("1.1.1.1/32").unwrap(),
+            rir: "APNIC".to_string(),
+        };
+
+        let mut list = vec![entry_a.clone(), entry_b.clone()];
+        list.sort();
+        assert_eq!(list, vec![entry_b, entry_a]);
+    }
 }

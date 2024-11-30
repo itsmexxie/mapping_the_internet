@@ -25,7 +25,7 @@ pub async fn download_file(config: &Config, section: &str) {
     let filepath_cnf = &get_config_value::<String>(config, &concat_string!(section, ".filepath"));
     let filepath = Path::new(filepath_cnf);
 
-    if !fs::metadata(filepath).await.is_ok() {
+    if fs::metadata(filepath).await.is_err() {
         let prefix = filepath.parent().unwrap();
         fs::create_dir_all(prefix).await.unwrap();
     }
@@ -37,18 +37,18 @@ pub async fn download_file(config: &Config, section: &str) {
         .header(USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15")
 		.send()
         .await
-        .expect(&format!("Failed to download file for section {}!", section))
+        .unwrap_or_else(|_| panic!("Failed to download file for section {}!", section))
         .bytes()
         .await
         .unwrap();
     let mut file_in_ref = file_in.as_ref();
     let mut file_out = File::create(filepath)
         .await
-        .expect(&format!("Failed to create file for section {}!", section));
+        .unwrap_or_else(|_| panic!("Failed to create file for section {}!", section));
 
     io::copy(&mut file_in_ref, &mut file_out)
         .await
-        .expect(&format!("Failed to write file for section {}!", section));
+        .unwrap_or_else(|_| panic!("Failed to write file for section {}!", section));
 
     info!("Downloaded file for section {}!", section);
 }
@@ -87,8 +87,8 @@ pub async fn check_file(config: &Config, section: &str) -> bool {
 pub async fn check_many_and_download(config: &Config, sections: &[&str]) {
     for section in sections {
         let section_str = concat_string!("providers.", section);
-        if !crate::providers::check_file(&config, &section_str).await {
-            crate::providers::download_file(&config, &section_str).await;
+        if !crate::providers::check_file(config, &section_str).await {
+            crate::providers::download_file(config, &section_str).await;
         }
     }
 }

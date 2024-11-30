@@ -60,28 +60,32 @@ impl FromStr for CIDR {
 
 impl PartialOrd for CIDR {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.mask.partial_cmp(&self.mask)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for CIDR {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.mask.cmp(&self.mask)
+        self.mask.cmp(&other.mask)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{net::Ipv4Addr, str::FromStr};
+    use std::{cmp::Ordering, net::Ipv4Addr, str::FromStr};
 
     use super::CIDR;
 
     #[test]
     fn test_address_cidr_check() {
         let prefix = CIDR::from_str("1.1.1.0/25").unwrap();
-        assert_eq!(
-            prefix.address_is_in(Ipv4Addr::from_str("1.1.1.127").unwrap().into()),
-            true
-        );
+        assert!(prefix.address_is_in(Ipv4Addr::from_str("1.1.1.127").unwrap().into()));
+    }
+
+    #[test]
+    fn test_cidr_ord() {
+        let prefix_a = CIDR::from_str("1.1.1.1/32").unwrap();
+        let prefix_b = CIDR::from_str("1.0.0.0/8").unwrap();
+        assert_eq!(prefix_a.cmp(&prefix_b), Ordering::Greater)
     }
 }

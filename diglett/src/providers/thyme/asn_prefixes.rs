@@ -1,27 +1,27 @@
-use std::{fmt::Display, path::Path, str::FromStr, u32};
+use std::{fmt::Display, path::Path, str::FromStr};
 
 use config::Config;
 use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{get_config_value, utils::CIDR};
+use crate::{get_config_value, providers, utils::CIDR};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AsnPrefixEntry {
-    pub prefix: CIDR,
+    pub cidr: CIDR,
     pub asn: u32,
 }
 
 impl PartialOrd for AsnPrefixEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.prefix.mask.partial_cmp(&self.prefix.mask)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for AsnPrefixEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.prefix.mask.cmp(&self.prefix.mask)
+        other.cidr.cmp(&self.cidr)
     }
 }
 
@@ -29,7 +29,7 @@ impl Display for AsnPrefixEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
             "address: {}, mask: {}, asn: {}",
-            self.prefix.prefix, self.prefix.mask, self.asn
+            self.cidr.prefix, self.cidr.mask, self.asn
         ))
     }
 }
@@ -38,7 +38,7 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     info!("Loading ASN prefixes...");
 
     // Check if we need to redownload file
-    crate::providers::check_many_and_download(config, &["thyme.asn_prefixes"]).await;
+    providers::check_many_and_download(config, &["thyme.asn_prefixes"]).await;
 
     // Get the configured filepath and read the file into memory
     let asn_prefixes_filepath_cnf =
@@ -56,7 +56,7 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     for (_, [prefix, asn]) in re.captures_iter(&contents_str).map(|c| c.extract()) {
         let parsed_cidr = CIDR::from_str(prefix).unwrap();
         prefixes.push(AsnPrefixEntry {
-            prefix: parsed_cidr,
+            cidr: parsed_cidr,
             asn: asn.parse().unwrap(),
         });
     }
@@ -64,4 +64,30 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     info!("Loaded ASN prefixes!");
     prefixes.sort();
     prefixes
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use crate::utils::CIDR;
+
+    use super::AsnPrefixEntry;
+
+    #[test]
+    fn test_rir_allocation_entry_ord() {
+        let entry_a = AsnPrefixEntry {
+            cidr: CIDR::from_str("1.0.0.0/8").unwrap(),
+            asn: 1,
+        };
+
+        let entry_b = AsnPrefixEntry {
+            cidr: CIDR::from_str("1.1.1.1/32").unwrap(),
+            asn: 1,
+        };
+
+        let mut list = vec![entry_a.clone(), entry_b.clone()];
+        list.sort();
+        assert_eq!(list, vec![entry_b, entry_a]);
+    }
 }

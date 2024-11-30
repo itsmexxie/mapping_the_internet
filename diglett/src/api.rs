@@ -16,32 +16,32 @@ use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-use crate::providers::{self, thyme::asn_prefixes::AsnPrefixEntry};
+use crate::providers;
 
 #[derive(Deserialize)]
 struct RirQuery {
     address: String,
 }
 
-// async fn get_rir(
-//     Query(query): Query<RirQuery>,
-//     State(state): State<AppState>,
-// ) -> Result<String, StatusCode> {
-//     match Ipv4Addr::from_str(&query.address.trim()) {
-//         Ok(address) => {
-//             let address_bits: u32 = address.into();
+async fn get_rir(
+    Query(query): Query<RirQuery>,
+    State(state): State<AppState>,
+) -> Result<String, StatusCode> {
+    match Ipv4Addr::from_str(query.address.trim()) {
+        Ok(address) => {
+            let address_bits: u32 = address.into();
 
-//             for entry in state.rir_allocations.iter() {
-//                 if entry.prefix.address_is_in(address_bits) {
-//                     return Ok(entry.rir.to_string());
-//                 }
-//             }
+            for entry in state.providers.read().await.thyme.rir.iter() {
+                if entry.cidr.address_is_in(address_bits) {
+                    return Ok(entry.rir.to_string());
+                }
+            }
 
-//             Err(StatusCode::NOT_FOUND)
-//         }
-//         Err(_) => Err(StatusCode::BAD_REQUEST),
-//     }
-// }
+            Err(StatusCode::NOT_FOUND)
+        }
+        Err(_) => Err(StatusCode::BAD_REQUEST),
+    }
+}
 
 #[derive(Deserialize)]
 struct AsnQuery {
@@ -52,12 +52,12 @@ async fn get_asn(
     Query(query): Query<AsnQuery>,
     State(state): State<AppState>,
 ) -> Result<String, StatusCode> {
-    match Ipv4Addr::from_str(&query.address.trim()) {
+    match Ipv4Addr::from_str(query.address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
             for entry in state.providers.read().await.thyme.asn.iter() {
-                if entry.prefix.address_is_in(address_bits) {
+                if entry.cidr.address_is_in(address_bits) {
                     return Ok(entry.asn.to_string());
                 }
             }
@@ -82,7 +82,7 @@ pub async fn run(config: Config, providers: Arc<RwLock<providers::Providers>>) {
 
     let app = Router::new()
         .route("/", get(index))
-        // .route("/rir", get(get_rir))
+        .route("/rir", get(get_rir))
         .route("/asn", get(get_asn))
         .with_state(state)
         .layer(TraceLayer::new_for_http());

@@ -16,7 +16,7 @@ pub mod utils;
 extern crate concat_string;
 
 pub fn get_config_value<T: for<'a> Deserialize<'a>>(config: &Config, id: &str) -> T {
-    config.get::<T>(id).expect(&format!("{} must be set!", id))
+    config.get::<T>(id).unwrap_or_else(|_| panic!("{} must be set!", id))
 }
 
 #[tokio::main]
