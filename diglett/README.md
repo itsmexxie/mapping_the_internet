@@ -3,7 +3,8 @@ A service that provides a nice HTTP abstraction over services that provide addre
 
 ## Service list
 The services which we are currently using to get information are as follows:
-- IANA number resources (reserved spaces)
+- ftp.arin.net (allocation states, RIRs, countries)
+- IANA number resources (reserved blocks)
 - thyme.apnic.net (RIRs, ASNs)
 
 ## TODO
@@ -12,4 +13,4 @@ The services which we are currently using to get information are as follows:
 - [ ] change rir algorithm to account for recovered addresses (via. [delegation stats](https://ftp.arin.net/pub/stats/lacnic/delegated-lacnic-latest))
 - [x] implement provider for arin stats files
 - [ ] implement provider for rdap responses (maybe inflight requests only? no static files?)
-- [ ] implement provider for iana number files
+- [x] implement provider for iana number files

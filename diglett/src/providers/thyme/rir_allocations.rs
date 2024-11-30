@@ -37,6 +37,10 @@ impl Display for RirAllocationEntry {
 pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     info!("Loading RIR allocations...");
 
+    // Check if we need to redownload file
+    crate::providers::check_many_and_download(config, &["thyme.rir_allocations"]).await;
+
+    // Get the configured filepath and read the file into memory
     let rir_allocations_filepath_cnf =
         &get_config_value::<String>(config, "providers.thyme.rir_allocations.filepath");
     let rir_allocations_filepath = Path::new(rir_allocations_filepath_cnf);
@@ -45,6 +49,7 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
     let mut contents_str = String::new();
     file.read_to_string(&mut contents_str).await.unwrap();
 
+    // Parse
     let mut rir_allocations = Vec::new();
 
     let re = Regex::new(r"[\t ]+(\d+\/\d)[\t ]+(.+)").unwrap();
@@ -56,5 +61,7 @@ pub async fn load(config: &Config) -> Vec<RirAllocationEntry> {
         });
     }
 
+    info!("Loaded RIR allocations!");
+    rir_allocations.sort();
     rir_allocations
 }

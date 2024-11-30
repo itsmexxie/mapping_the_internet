@@ -37,6 +37,10 @@ impl Display for AsnPrefixEntry {
 pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     info!("Loading ASN prefixes...");
 
+    // Check if we need to redownload file
+    crate::providers::check_many_and_download(config, &["thyme.asn_prefixes"]).await;
+
+    // Get the configured filepath and read the file into memory
     let asn_prefixes_filepath_cnf =
         &get_config_value::<String>(config, "providers.thyme.asn_prefixes.filepath");
     let asn_prefixes_filepath = Path::new(asn_prefixes_filepath_cnf);
@@ -45,6 +49,7 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     let mut contents_str = String::new();
     file.read_to_string(&mut contents_str).await.unwrap();
 
+    // Parse
     let mut prefixes = Vec::new();
 
     let re = Regex::new(r"([\d\.]+\/\d{1,2})[\t ]+(\d+)").unwrap();
@@ -57,7 +62,6 @@ pub async fn load(config: &Config) -> Vec<AsnPrefixEntry> {
     }
 
     info!("Loaded ASN prefixes!");
-
     prefixes.sort();
     prefixes
 }

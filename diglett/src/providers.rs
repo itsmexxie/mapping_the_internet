@@ -1,6 +1,7 @@
 use std::{path::Path, time::SystemTime};
 
 use config::Config;
+use reqwest::header::USER_AGENT;
 use tokio::{
     fs::{self, File},
     io,
@@ -8,12 +9,14 @@ use tokio::{
 use tracing::{error, info};
 
 pub mod arin;
+pub mod iana;
 pub mod thyme;
 
 use crate::get_config_value;
 
 pub struct Providers {
     pub arin: arin::Providers,
+    pub iana: iana::Providers,
     pub thyme: thyme::Providers,
 }
 
@@ -27,7 +30,12 @@ pub async fn download_file(config: &Config, section: &str) {
         fs::create_dir_all(prefix).await.unwrap();
     }
 
-    let file_in = reqwest::get(&url)
+    let client = reqwest::Client::new();
+
+    let file_in = client
+        .get(&url)
+        .header(USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15")
+		.send()
         .await
         .expect(&format!("Failed to download file for section {}!", section))
         .bytes()
@@ -72,6 +80,15 @@ pub async fn check_file(config: &Config, section: &str) -> bool {
                 section
             );
             false
+        }
+    }
+}
+
+pub async fn check_many_and_download(config: &Config, sections: &[&str]) {
+    for section in sections {
+        let section_str = concat_string!("providers.", section);
+        if !crate::providers::check_file(&config, &section_str).await {
+            crate::providers::download_file(&config, &section_str).await;
         }
     }
 }

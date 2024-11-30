@@ -1,4 +1,4 @@
-use std::{net::Ipv4Addr, str::FromStr};
+use std::{fmt::Display, net::Ipv4Addr, str::FromStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CIDR {
@@ -14,6 +14,16 @@ impl CIDR {
     pub fn address_is_in(&self, address: u32) -> bool {
         let mask = u32::MAX << (32 - self.mask);
         (self.prefix & mask) == (address & mask)
+    }
+}
+
+impl Display for CIDR {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!(
+            "prefix: {}, mask: {}",
+            Ipv4Addr::from_bits(self.prefix),
+            self.mask
+        ))
     }
 }
 
@@ -45,6 +55,18 @@ impl FromStr for CIDR {
             prefix: parsed_address.into(),
             mask: parsed_mask,
         })
+    }
+}
+
+impl PartialOrd for CIDR {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        other.mask.partial_cmp(&self.mask)
+    }
+}
+
+impl Ord for CIDR {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.mask.cmp(&self.mask)
     }
 }
 

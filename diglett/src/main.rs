@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use config::Config;
 use mtilib::pokedex::{PokedexConfig, PokedexUnitConfig};
-use providers::arin;
+use providers::{arin, iana, thyme};
 use serde::Deserialize;
 use tokio::{signal, sync::RwLock};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -97,30 +97,17 @@ async fn main() {
         }
     });
 
-    // Load files
-    let sections = [
-        "arin.stats.arin",
-        "arin.stats.ripencc",
-        "arin.stats.apnic",
-        "arin.stats.lacnic",
-        "arin.stats.afrinic",
-        "thyme.asn_prefixes",
-        "thyme.rir_allocations",
-    ];
-    for section in sections {
-        let section_str = concat_string!("providers.", section);
-        if !providers::check_file(&config, &section_str).await {
-            providers::download_file(&config, &section_str).await;
-        }
-    }
-
+    // Load providers
     let providers = Arc::new(RwLock::new(providers::Providers {
-        arin: providers::arin::Providers {
+        arin: arin::Providers {
             stats: arin::stats::load(&config).await,
         },
-        thyme: providers::thyme::Providers {
-            asn: providers::thyme::asn_prefixes::load(&config).await,
-            rir: providers::thyme::rir_allocations::load(&config).await,
+        iana: iana::Providers {
+            reserved: iana::reserved::load(&config).await,
+        },
+        thyme: thyme::Providers {
+            asn: thyme::asn_prefixes::load(&config).await,
+            rir: thyme::rir_allocations::load(&config).await,
         },
     }));
 
