@@ -5,7 +5,7 @@ use mtilib::types::{AllocationState, Rir};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{get_config_value, utils::CIDR};
+use crate::{get_config_value, providers, utils::CIDR};
 
 const HEADER_SIZE: u32 = 4;
 
@@ -51,9 +51,8 @@ pub async fn load(config: &Config) -> Vec<StatEntry> {
         "arin.stats.apnic",
         "arin.stats.lacnic",
         "arin.stats.afrinic",
-        // "arin.stats.test",
     ];
-    // providers::check_many_and_download(config, &sections).await;
+    providers::check_many_and_download(config, &sections).await;
 
     let mut stat_entries = Vec::new();
 
