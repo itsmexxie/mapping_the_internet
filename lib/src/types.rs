@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AllocationState {
+    Unknown,
     Reserved,
     Unallocated,
     Allocated,
@@ -29,9 +30,10 @@ impl FromStr for AllocationState {
 impl ToString for AllocationState {
     fn to_string(&self) -> String {
         match self {
-            AllocationState::Reserved => String::from("Reserved"),
-            AllocationState::Unallocated => String::from("Unallocated"),
-            AllocationState::Allocated => String::from("Allocated"),
+            AllocationState::Unknown => String::from("unknown"),
+            AllocationState::Reserved => String::from("reserved"),
+            AllocationState::Unallocated => String::from("unallocated"),
+            AllocationState::Allocated => String::from("allocated"),
         }
     }
 }

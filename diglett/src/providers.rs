@@ -57,7 +57,9 @@ pub async fn check_file(config: &Config, section: &str) -> bool {
     // Check if we need to download a fresh asn prefixes file
     let filepath_cnf = &get_config_value::<String>(config, &concat_string!(section, ".filepath"));
     let filepath = Path::new(filepath_cnf);
-    let max_time = get_config_value::<i64>(config, &concat_string!(section, ".max_time"));
+    let max_time = config
+        .get_int(&concat_string!(section, ".max_time"))
+        .unwrap_or(2592000); // Default 1 month expiration time
 
     if !filepath.exists() {
         info!("File for section {} missing!", section);

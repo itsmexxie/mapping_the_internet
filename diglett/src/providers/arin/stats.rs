@@ -5,7 +5,9 @@ use mtilib::types::{AllocationState, Rir};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{get_config_value, providers, utils::CIDR};
+use crate::{get_config_value, utils::CIDR};
+
+const HEADER_SIZE: u32 = 4;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StatEntry {
@@ -49,8 +51,9 @@ pub async fn load(config: &Config) -> Vec<StatEntry> {
         "arin.stats.apnic",
         "arin.stats.lacnic",
         "arin.stats.afrinic",
+        // "arin.stats.test",
     ];
-    providers::check_many_and_download(config, &sections).await;
+    // providers::check_many_and_download(config, &sections).await;
 
     let mut stat_entries = Vec::new();
 
@@ -66,27 +69,32 @@ pub async fn load(config: &Config) -> Vec<StatEntry> {
         file.read_to_string(&mut contents_str).await.unwrap();
         let lines = contents_str.split("\n").collect::<Vec<_>>();
 
-        let mut i = 1;
+        let mut i: usize = 0;
         let mut parsed_header = false;
-        let mut ipv4_offset = 4;
-        let mut ipv4_count = 0;
+        let mut parsed_header_sections: u32 = 0;
+        let mut ipv4_offset: u32 = 0;
+        let mut ipv4_count: u32 = 0;
+        let mut parsed_ipv4: u32 = 0;
         loop {
+            if i > lines.len() {
+                break;
+            }
+
             if lines[i].starts_with("#") {
                 i += 1;
                 continue;
             }
 
-            if i >= ipv4_offset + ipv4_count {
-                break;
-            }
-
             if parsed_header {
+                if parsed_ipv4 >= ipv4_count {
+                    break;
+                }
+
                 let parts = lines[i].split("|").collect::<Vec<_>>();
                 let alloc_state = AllocationState::from_str(parts[6]).unwrap();
                 let country = match alloc_state {
-                    AllocationState::Reserved => None,
-                    AllocationState::Unallocated => None,
                     AllocationState::Allocated => Some(parts[1].to_string()),
+                    _ => None,
                 };
 
                 stat_entries.push(StatEntry {
@@ -100,20 +108,28 @@ pub async fn load(config: &Config) -> Vec<StatEntry> {
                     country,
                 });
 
+                parsed_ipv4 += 1;
                 i += 1;
             } else {
                 let parts = lines[i].split("|").collect::<Vec<_>>();
+
                 match parts[2] {
                     "ipv4" => {
-                        ipv4_count = parts[4].parse::<usize>().unwrap();
-                        i = ipv4_offset;
+                        parsed_header_sections += 1;
                         parsed_header = true;
+                        ipv4_count = parts[4].parse::<u32>().unwrap();
+                        i += (ipv4_offset + (HEADER_SIZE - parsed_header_sections) + 1) as usize;
+                        // header size is always 4
                     }
                     "ipv6" | "asn" => {
-                        ipv4_offset += parts[4].parse::<usize>().unwrap();
+                        parsed_header_sections += 1;
+                        ipv4_offset += parts[4].parse::<u32>().unwrap();
                         i += 1;
                     }
-                    _ => i += 1,
+                    _ => {
+                        parsed_header_sections += 1;
+                        i += 1;
+                    }
                 }
             }
         }

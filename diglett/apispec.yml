@@ -5,36 +5,79 @@ info:
   version: "0.1.0"
 
 paths:
-  /rir:
+  /allocation:
     get:
-      summary: "Get the RIR for the specified address"
+      summary: "Get the allocation state for the specified address"
       parameters:
-        - name: address
-          in: query
-          schema:
-            type: string
+        - $ref: "#/components/parameters/addressParam"
       responses:
         200:
-          description: "RIR name (one of ARIN, RIPE NCC, APNIC, LACNIC, AfriNIC)"
-  /asn:
-    get:
-      summary: "Get the ASN for the specified IP address"
-      parameters:
-        - name: address
-          in: query
-          schema:
-            type: string
-      responses:
-        200:
-          description: "AS number"
+          description: "Allocation state (one of Unknown, Reserved, Unallocated, Allocated)"
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  asn:
+                  value:
+                    type: string
+        400:
+          description: "Bad IP address"
+  /rir:
+    get:
+      summary: "Get the RIR for the specified address. Looks up the ARIN stat files first, if no record is found then tries to search the IANA allocation file"
+      parameters:
+        - $ref: "#/components/parameters/addressParam"
+      responses:
+        200:
+          description: "RIR name (one of ARIN, RIPE NCC, APNIC, LACNIC, AfriNIC) or null if no RIR found"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: string
+        400:
+          description: "Bad IP address"
+  /asn:
+    get:
+      summary: "Get the ASN for the specified IP address"
+      parameters:
+        - $ref: "#/components/parameters/addressParam"
+      responses:
+        200:
+          description: "AS number or null if no AS found"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
                     type: number
         400:
           description: "Bad IP address"
-        404:
-          description: "No ASN was found"
+  /country:
+    get:
+      summary: "Get the country code for the specified IP address"
+      parameters:
+        - $ref: "#/components/parameters/addressParam"
+      responses:
+        200:
+          description: "Country code or null if no country code found"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: string
+        400:
+          description: "Bad IP address"
+
+components:
+  parameters:
+    addressParam:
+      name: address
+      in: query
+      schema:
+        type: string
