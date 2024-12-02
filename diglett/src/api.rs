@@ -167,7 +167,7 @@ async fn get_country(
 }
 
 async fn index() -> &'static str {
-    "Diglett API, v0.1.0"
+    "Diglett API, v1.0.0"
 }
 
 #[derive(Clone)]

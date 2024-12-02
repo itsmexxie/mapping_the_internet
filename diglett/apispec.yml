@@ -5,7 +5,7 @@ info:
   version: "0.1.0"
 
 paths:
-  /allocation:
+  /{address}/allocation:
     get:
       summary: "Get the allocation state for the specified address"
       parameters:
@@ -22,7 +22,7 @@ paths:
                     type: string
         400:
           description: "Bad IP address"
-  /rir:
+  /{address}/rir:
     get:
       summary: "Get the RIR for the specified address."
       parameters:
@@ -44,7 +44,7 @@ paths:
                     type: string
         400:
           description: "Bad IP address"
-  /asn:
+  /{address}/asn:
     get:
       summary: "Get the ASN for the specified IP address"
       parameters:
@@ -61,7 +61,7 @@ paths:
                     type: number
         400:
           description: "Bad IP address"
-  /country:
+  /{address}/country:
     get:
       summary: "Get the country code for the specified IP address"
       parameters:
@@ -83,6 +83,7 @@ components:
   parameters:
     addressParam:
       name: address
-      in: query
+      in: path
+      required: true
       schema:
         type: string
