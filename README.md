@@ -1,25 +1,29 @@
 # Mapping the Internet
 ## Address
 We want to know these things about a specific address:
-- Whether it is assigned or reserved
+- What is its allocation state (Unknown, Reserved, Unallocated, Allocated)
 - Whether it is routed
 - Whether it is online
+- Which RIR this address originally falls under (/8 block segments)
+- Which RIR does this address belong to
+- Which ASN does this address belong to
+- What ports are open on this server
 - What services are available on the server
-- Which RIR this address falls under
-- Who owns this address
-- Which ASN does this address fall under
 
+Here is the address record structure from the database
 ```yml
-- id: string # The actual IP address
-- state_id: bool # Whether the IP address is assigned, unassigned or reserved
-- routed: bool # Whether the IP address is routed
-- online: bool # Whether the IP address is online
+- id: string
+- allocation_state_id: bool
+- routed: bool
+- online: bool
+- top_rir_id: int
 - rir_id: int
 - asn_id: int
+- country_id: int
 ```
 
 ### States
-An IPv4 address can be in one of the following states: 
+An IPv4 address can be in one of the following states:
 - `reserved` - the address is reserved
 - `unassigned` - the address wasn't yet assigned to a register
 - `assigned unrouted` - the address was assigned, but no routers know how to get there
