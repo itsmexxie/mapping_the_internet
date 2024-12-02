@@ -5,14 +5,11 @@ info:
   version: "0.1.0"
 
 paths:
-  /query:
+  /query/address/{address}:
     get:
       summary: "Get information about an IP address"
       parameters:
-        - name: address
-          in: "query"
-          schema:
-            type: string
+        - $ref: "#/components/parameters/addressParam"
       responses:
         200:
           description: "IP info"
@@ -44,15 +41,11 @@ paths:
                     type: number
         400:
           description: "Malformed IP address specified"
-  /query/online:
+  /query/address/{address}/online:
     get:
       summary: "Ping the specified IP address and return whether it is online or offline."
       parameters:
-        - name: address
-          in: "query"
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/addressParam"
       responses:
         200:
           description: "IP status"
@@ -76,3 +69,12 @@ paths:
       responses:
         200:
           description: "OK"
+
+components:
+  parameters:
+    addressParam:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string

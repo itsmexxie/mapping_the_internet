@@ -1,11 +1,12 @@
 use core::panic;
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 
 use config::Config;
-use mtilib::pokedex::PokedexConfig;
+use mtilib::{pokedex::PokedexConfig, types::AllocationState};
 use rand::seq::SliceRandom;
-use reqwest::StatusCode;
 use tracing::{error, info};
+
+use crate::utils::ValueResponse;
 
 pub struct Diglett {
     url: String,
@@ -57,9 +58,12 @@ impl Diglett {
                 match diglett_client.get(pidgeotto_address).send().await {
                     Ok(_) => {
                         info!("Successfully connected to a diglett instance!");
-                        return Diglett {
-                            url: pidgeotto_address.to_owned(),
-                        };
+                        let mut url = pidgeotto_address.to_owned();
+                        if !url.ends_with("/") {
+                            url = concat_string!(url, "/");
+                        }
+
+                        return Diglett { url };
                     }
                     Err(_) => {
                         error!("Error while connecting to configured diglett, trying another...");
@@ -72,23 +76,38 @@ impl Diglett {
         panic!("Failed to create Diglett client, no running instances found!");
     }
 
-    pub async fn rir(&self, address: Ipv4Addr) -> Option<String> {
+    pub async fn allocation_state(
+        &self,
+        address: Ipv4Addr,
+    ) -> Result<AllocationState, reqwest::Error> {
         let diglett_client = reqwest::Client::new();
 
         match diglett_client
-            .get(concat_string!(
-                self.url,
-                "/rir?address=",
-                address.to_string()
-            ))
+            .get(concat_string!(self.url, address.to_string(), "/rir"))
             .send()
             .await
         {
-            Ok(res) => match res.status() {
-                StatusCode::OK => Some(res.text().await.unwrap()),
-                StatusCode::NOT_FOUND => None,
-                _ => None,
-            },
+            Ok(res) => {
+                let data: ValueResponse<String> = res.json().await.unwrap();
+                Ok(AllocationState::from_str(&data.value).unwrap())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub async fn rir(&self, address: Ipv4Addr, top: bool) -> Option<String> {
+        let diglett_client = reqwest::Client::new();
+
+        let mut request_url = concat_string!(self.url, address.to_string(), "/rir");
+        if top {
+            request_url = concat_string!(request_url, "?top=true");
+        }
+
+        match diglett_client.get(request_url).send().await {
+            Ok(res) => {
+                let data: ValueResponse<Option<String>> = res.json().await.unwrap();
+                data.value
+            }
             Err(_) => None,
         }
     }
@@ -97,19 +116,30 @@ impl Diglett {
         let diglett_client = reqwest::Client::new();
 
         match diglett_client
-            .get(concat_string!(
-                self.url,
-                "/asn?address=",
-                address.to_string()
-            ))
+            .get(concat_string!(self.url, address.to_string(), "/asn"))
             .send()
             .await
         {
-            Ok(res) => match res.status() {
-                StatusCode::OK => Some(res.text().await.unwrap().parse::<u32>().unwrap()),
-                StatusCode::NOT_FOUND => None,
-                _ => None,
-            },
+            Ok(res) => {
+                let data: ValueResponse<Option<u32>> = res.json().await.unwrap();
+                data.value
+            }
+            Err(_) => None,
+        }
+    }
+
+    pub async fn country(&self, address: Ipv4Addr) -> Option<String> {
+        let diglett_client = reqwest::Client::new();
+
+        match diglett_client
+            .get(concat_string!(self.url, address.to_string(), "/country"))
+            .send()
+            .await
+        {
+            Ok(res) => {
+                let data: ValueResponse<Option<String>> = res.json().await.unwrap();
+                data.value
+            }
             Err(_) => None,
         }
     }

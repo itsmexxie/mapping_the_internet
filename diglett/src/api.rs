@@ -12,17 +12,12 @@ use axum::{
 };
 use config::Config;
 use mtilib::types::{AllocationState, Rir};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::providers;
-
-#[derive(Deserialize)]
-struct AddressQuery {
-    address: String,
-}
 
 #[derive(Serialize)]
 struct ValueResponse<T>
@@ -32,22 +27,17 @@ where
     value: T,
 }
 
-#[derive(Serialize)]
-struct AllocationResponse {
-    value: String,
-}
-
 async fn get_allocation(
     Path(address): Path<String>,
     State(state): State<AppState>,
-) -> Result<Json<AllocationResponse>, StatusCode> {
+) -> Result<Json<ValueResponse<String>>, StatusCode> {
     match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
 
             for entry in state.providers.read().await.iana.reserved.iter() {
                 if entry.address_is_in(address_bits) {
-                    return Ok(Json(AllocationResponse {
+                    return Ok(Json(ValueResponse {
                         value: AllocationState::Reserved.id(),
                     }));
                 }
@@ -55,13 +45,13 @@ async fn get_allocation(
 
             for entry in state.providers.read().await.arin.stats.iter() {
                 if entry.cidr.address_is_in(address_bits) {
-                    return Ok(Json(AllocationResponse {
+                    return Ok(Json(ValueResponse {
                         value: entry.allocation_state.id(),
                     }));
                 }
             }
 
-            Ok(Json(AllocationResponse {
+            Ok(Json(ValueResponse {
                 value: AllocationState::Unknown.id(),
             }))
         }

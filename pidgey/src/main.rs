@@ -14,6 +14,7 @@ pub mod api;
 pub mod diglett;
 pub mod gust;
 pub mod pidgeotto;
+pub mod utils;
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +24,7 @@ async fn main() {
     // Config
     let config = Arc::new(
         Config::builder()
-            .add_source(config::File::with_name("daemon.config.toml"))
+            .add_source(config::File::with_name("config.toml"))
             .build()
             .unwrap(),
     );

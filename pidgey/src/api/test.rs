@@ -1,11 +1,11 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     net::{IpAddr, Ipv4Addr},
     str::FromStr,
 };
@@ -15,14 +15,10 @@ use crate::gust::Gust;
 
 use super::AppState;
 
-#[derive(Deserialize)]
-pub struct AddressQuery {
-    pub address: String,
-}
-
 #[derive(Serialize)]
 pub struct IndexResponse {
     pub allocation_state: String,
+    pub top_rir: Option<String>,
     pub rir: Option<String>,
     pub asn: Option<u32>,
     pub online: OnlineResponse,
@@ -30,7 +26,7 @@ pub struct IndexResponse {
 }
 
 pub async fn index(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<IndexResponse>, StatusCode> {
     let _permit = state.worker_permits.acquire().await.unwrap();
@@ -106,7 +102,7 @@ pub async fn index(
 }
 
 pub async fn allocation_state(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<String, StatusCode> {
     let _permit = state.worker_permits.acquire().await.unwrap();
@@ -120,7 +116,7 @@ pub struct RirResponse {
 }
 
 pub async fn rir(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<RirResponse>, StatusCode> {
     let _permit = state.worker_permits.acquire().await;
@@ -146,7 +142,7 @@ pub struct AsnResponse {
 }
 
 pub async fn asn(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<AsnResponse>, StatusCode> {
     let _permit = state.worker_permits.acquire().await;
@@ -173,7 +169,7 @@ pub struct OnlineResponse {
 }
 
 pub async fn online(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<OnlineResponse>, StatusCode> {
     let _permit = state.worker_permits.acquire().await.unwrap();
@@ -208,7 +204,7 @@ pub struct PortResponse {
 }
 
 pub async fn ports(
-    query: Query<AddressQuery>,
+    Path(address): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PortResponse>>, StatusCode> {
     let _permit = state.worker_permits.acquire().await.unwrap();

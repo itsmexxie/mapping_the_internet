@@ -28,6 +28,12 @@ impl ToIpv4Addrs for str {
     }
 }
 
+impl ToIpv4Addrs for Ipv4Addr {
+    fn to_ipv4_address(&self) -> Result<Ipv4Addr, AddrParseError> {
+        Ok(*self)
+    }
+}
+
 pub struct Gust(Ipv4Addr);
 
 impl Gust {

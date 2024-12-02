@@ -12,6 +12,10 @@ use crate::diglett::Diglett;
 
 pub mod query;
 
+async fn index() -> &'static str {
+    "Pidgey API, v0.1.0"
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
@@ -27,16 +31,8 @@ pub async fn run(config: Arc<Config>, worker_permits: Arc<Semaphore>, diglett: A
     };
 
     let app = Router::new()
-        .nest(
-            "/query",
-            Router::new()
-                .route("/", get(query::index))
-                .route("/allocation_state", get(query::allocation_state))
-                .route("/rir", get(query::rir))
-                .route("/asn", get(query::asn))
-                .route("/online", get(query::online))
-                .route("/ports", get(query::ports)),
-        )
+        .route("/", get(index))
+        .nest("/query", query::router(state.clone()))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
     let app_port = config.get("api.port").expect("api.port must be set!");
