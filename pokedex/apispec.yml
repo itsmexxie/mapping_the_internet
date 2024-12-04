@@ -33,6 +33,13 @@ paths:
       responses:
         200:
           description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
         400:
           description: "Invalid IP address and/or port"
         401:

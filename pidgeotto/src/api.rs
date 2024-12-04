@@ -5,14 +5,32 @@ use std::{
 
 use axum::{routing::any, Router};
 use config::Config;
+use mtilib::auth::JWTKeys;
+use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
+use crate::pidgey::Pidgey;
+
 pub mod ws;
 
-pub async fn run(config: Arc<Config>) {
+#[derive(Clone)]
+pub struct AppState {
+    pub config: Arc<Config>,
+    pub jwt_keys: Arc<JWTKeys>,
+    pub pidgey: Arc<RwLock<Pidgey>>,
+}
+
+pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, pidgey: Arc<RwLock<Pidgey>>) {
+    let app_state = AppState {
+        config: config.clone(),
+        jwt_keys,
+        pidgey,
+    };
+
     let app = Router::new()
         .route("/ws", any(ws::ws_handler))
+        .with_state(app_state)
         .layer(TraceLayer::new_for_http());
     let app_port = config.get("api.port").expect("api.port must be set!");
 

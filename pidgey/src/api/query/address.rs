@@ -15,7 +15,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use surge_ping::SurgeError;
-use tokio::sync::Mutex;
 
 use crate::{api::AppState, gust::Gust, utils::ValueResponse};
 
@@ -43,7 +42,7 @@ pub async fn allocation(
         Ok(state) => Ok(Json(ValueResponse {
             value: state.to_string(),
         })),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(status) => Err(status),
     }
 }
 
@@ -58,27 +57,35 @@ pub async fn rir(
     query: Query<RirQuery>,
     state: State<AppState>,
 ) -> Result<Json<ValueResponse<Option<String>>>, StatusCode> {
-    Ok(Json(ValueResponse {
-        value: state.diglett.rir(address, query.top).await,
-    }))
+    match state.diglett.rir(address, query.top).await {
+        Ok(rir) => match rir {
+            Some(rir) => Ok(Json(ValueResponse {
+                value: Some(rir.to_string()),
+            })),
+            None => Ok(Json(ValueResponse { value: None })),
+        },
+        Err(status) => Err(status),
+    }
 }
 
 pub async fn asn(
     Extension(address): Extension<Ipv4Addr>,
     state: State<AppState>,
 ) -> Result<Json<ValueResponse<Option<u32>>>, StatusCode> {
-    Ok(Json(ValueResponse {
-        value: state.diglett.asn(address).await,
-    }))
+    match state.diglett.asn(address).await {
+        Ok(asn) => Ok(Json(ValueResponse { value: asn })),
+        Err(status) => Err(status),
+    }
 }
 
 pub async fn country(
     Extension(address): Extension<Ipv4Addr>,
     state: State<AppState>,
 ) -> Result<Json<ValueResponse<Option<String>>>, StatusCode> {
-    Ok(Json(ValueResponse {
-        value: state.diglett.country(address).await,
-    }))
+    match state.diglett.country(address).await {
+        Ok(country) => Ok(Json(ValueResponse { value: country })),
+        Err(status) => Err(status),
+    }
 }
 
 #[derive(Serialize)]
@@ -137,40 +144,14 @@ pub async fn port_range(
                 },
             };
 
-            // Values from different ports
-            // This is stored in a hashmap because we theoretically want to query nonconsecutive ports
-            let ports = Arc::new(Mutex::new(HashMap::new()));
-            let mut port_tasks = Vec::new();
-
-            // Try the ports parallely
-            for port in gust_range_start..=gust_range_end {
-                let cloned_ports = ports.clone();
-                let cloned_gust = gust.clone();
-                let cloned_state = state.clone();
-                port_tasks.push(tokio::spawn(async move {
-                    let result = cloned_gust
-                        .attack(
-                            port,
-                            cloned_state
-                                .config
-                                .get_int("settings.gust.timeout")
-                                .unwrap_or(10) as u32,
-                        )
-                        .await;
-
-                    cloned_ports.lock().await.insert(port, result);
-                }));
-            }
-
-            for port_task in port_tasks {
-                port_task.await.unwrap();
-            }
-
             Ok(Json(ValueResponse {
-                value: match Arc::try_unwrap(ports) {
-                    Ok(ports) => ports.into_inner(),
-                    Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
-                },
+                value: gust
+                    .attack_range(
+                        gust_range_start..=gust_range_end,
+                        state.config.get_int("settings.gust.timeout").unwrap_or(10) as u32,
+                    )
+                    .await
+                    .unwrap(),
             }))
         }
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -187,7 +168,7 @@ pub async fn port(
                 let port_online = gust
                     .attack(
                         port,
-                        state.config.get_int("settings.gust.timeout").unwrap_or(10) as u32,
+                        state.config.get_int("settings.gust.timeout").unwrap_or(5) as u32,
                     )
                     .await;
 

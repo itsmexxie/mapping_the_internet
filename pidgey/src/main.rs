@@ -45,7 +45,7 @@ async fn main() {
     let jwt = match mtilib::pokedex::login(&pokedex_config).await {
         Ok(token) => {
             info!("Successfully logged into Pokedex!");
-            token
+            Arc::new(token)
         }
         Err(error) => return error!(error),
     };
@@ -64,11 +64,12 @@ async fn main() {
     // Graceful shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
+    let signal_task_jwt = jwt.clone();
     tokio::spawn(async move {
         match signal::ctrl_c().await {
             Ok(_) => {
                 // Logout of Pokedex
-                mtilib::pokedex::logout(&pokedex_config, &jwt).await;
+                mtilib::pokedex::logout(&pokedex_config, &signal_task_jwt).await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks
@@ -100,9 +101,11 @@ async fn main() {
     // Pidgeotto connection task
     let pidgeotto_task_token = task_token.clone();
     let pidgeotto_config = config.clone();
+    let pidgeotto_jwt = jwt.clone();
+    let pidgeotto_diglett = diglett.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = pidgeotto::run(pidgeotto_config) => {
+            () = pidgeotto::run(pidgeotto_config, pidgeotto_jwt, diglett) => {
                 info!("Pidgeotto task exited on its own!")
             }
             () = pidgeotto_task_token.cancelled() => {

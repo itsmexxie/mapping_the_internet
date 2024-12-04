@@ -2,7 +2,10 @@ use core::panic;
 use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 
 use config::Config;
-use mtilib::{pokedex::PokedexConfig, types::AllocationState};
+use mtilib::{
+    pokedex::PokedexConfig,
+    types::{AllocationState, Rir},
+};
 use rand::seq::SliceRandom;
 use tracing::{error, info};
 
@@ -79,11 +82,11 @@ impl Diglett {
     pub async fn allocation_state(
         &self,
         address: Ipv4Addr,
-    ) -> Result<AllocationState, reqwest::Error> {
+    ) -> Result<AllocationState, reqwest::StatusCode> {
         let diglett_client = reqwest::Client::new();
 
         match diglett_client
-            .get(concat_string!(self.url, address.to_string(), "/rir"))
+            .get(concat_string!(self.url, address.to_string(), "/allocation"))
             .send()
             .await
         {
@@ -91,11 +94,15 @@ impl Diglett {
                 let data: ValueResponse<String> = res.json().await.unwrap();
                 Ok(AllocationState::from_str(&data.value).unwrap())
             }
-            Err(error) => Err(error),
+            Err(_) => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 
-    pub async fn rir(&self, address: Ipv4Addr, top: bool) -> Option<String> {
+    pub async fn rir(
+        &self,
+        address: Ipv4Addr,
+        top: bool,
+    ) -> Result<Option<Rir>, reqwest::StatusCode> {
         let diglett_client = reqwest::Client::new();
 
         let mut request_url = concat_string!(self.url, address.to_string(), "/rir");
@@ -104,15 +111,22 @@ impl Diglett {
         }
 
         match diglett_client.get(request_url).send().await {
-            Ok(res) => {
-                let data: ValueResponse<Option<String>> = res.json().await.unwrap();
-                data.value
-            }
-            Err(_) => None,
+            Ok(res) => match res.status() {
+                reqwest::StatusCode::OK => {
+                    let data: ValueResponse<Option<String>> = res.json().await.unwrap();
+                    match data.value {
+                        Some(value) => Ok(Some(Rir::from_str(&value).unwrap())),
+                        None => Ok(None),
+                    }
+                }
+                reqwest::StatusCode::BAD_REQUEST => Err(reqwest::StatusCode::BAD_REQUEST),
+                _ => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
+            },
+            Err(_) => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 
-    pub async fn asn(&self, address: Ipv4Addr) -> Option<u32> {
+    pub async fn asn(&self, address: Ipv4Addr) -> Result<Option<u32>, reqwest::StatusCode> {
         let diglett_client = reqwest::Client::new();
 
         match diglett_client
@@ -120,15 +134,19 @@ impl Diglett {
             .send()
             .await
         {
-            Ok(res) => {
-                let data: ValueResponse<Option<u32>> = res.json().await.unwrap();
-                data.value
-            }
-            Err(_) => None,
+            Ok(res) => match res.status() {
+                reqwest::StatusCode::OK => {
+                    let data: ValueResponse<Option<u32>> = res.json().await.unwrap();
+                    Ok(data.value)
+                }
+                reqwest::StatusCode::BAD_REQUEST => Err(reqwest::StatusCode::BAD_REQUEST),
+                _ => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
+            },
+            Err(_) => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 
-    pub async fn country(&self, address: Ipv4Addr) -> Option<String> {
+    pub async fn country(&self, address: Ipv4Addr) -> Result<Option<String>, reqwest::StatusCode> {
         let diglett_client = reqwest::Client::new();
 
         match diglett_client
@@ -136,11 +154,15 @@ impl Diglett {
             .send()
             .await
         {
-            Ok(res) => {
-                let data: ValueResponse<Option<String>> = res.json().await.unwrap();
-                data.value
-            }
-            Err(_) => None,
+            Ok(res) => match res.status() {
+                reqwest::StatusCode::OK => {
+                    let data: ValueResponse<Option<String>> = res.json().await.unwrap();
+                    Ok(data.value)
+                }
+                reqwest::StatusCode::BAD_REQUEST => Err(reqwest::StatusCode::BAD_REQUEST),
+                _ => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
+            },
+            Err(_) => Err(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 }

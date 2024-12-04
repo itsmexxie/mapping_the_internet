@@ -7,6 +7,18 @@ The services which we are currently using to get information are as follows:
 - IANA number resources (RIRs, reserved blocks)
 - thyme.apnic.net (RIRs, ASNs)
 
+## Usage
+### Cargo
+1. Install [rust](https://www.rust-lang.org/learn/get-started)
+2. Create a `config.toml` file akin to [this](./config/config.toml) template
+3. Run with `cargo run`
+
+### Docker
+Build with `docker build -f diglett/Dockerfile .` (must be ran from the root of this repo!). Than run the resulting image with the following command:
+```
+docker run --rm -v ./config.toml:/config.toml -p 7090:7090 {{ IMAGE_ID }}
+```
+
 ## TODO
 - [ ] implement automatic downloads of asn prefixes file with cron
 - [x] change rir algorithm to account for recovered addresses (via. [delegation stats](https://ftp.arin.net/pub/stats/lacnic/delegated-lacnic-latest))

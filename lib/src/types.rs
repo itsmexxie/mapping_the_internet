@@ -1,5 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AllocationState {
     Unknown,
@@ -49,7 +51,7 @@ impl FromStr for AllocationState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Rir {
     Unknown,
     Arin,

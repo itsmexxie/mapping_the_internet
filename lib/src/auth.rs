@@ -1,5 +1,12 @@
+use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncReadExt};
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JWTClaims {
+    pub id: String,
+    pub srv: String,
+    pub exp: u64,
+}
 pub struct JWTKeys {
     pub private: Option<Vec<u8>>,
     pub public: Vec<u8>,

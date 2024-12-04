@@ -5,10 +5,11 @@ use axum::{
 };
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
+use mtilib::auth::JWTClaims;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{AppState, JWTClaims};
+use super::AppState;
 use crate::models::{NewServiceUnit, Service, ServiceUnit};
 use crate::schema::{ServiceUnits, Services};
 

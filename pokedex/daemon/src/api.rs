@@ -93,13 +93,6 @@ async fn get_service_units(
     Ok(Json(api_results))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct JWTClaims {
-    id: String,
-    srv: String,
-    exp: u64,
-}
-
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
