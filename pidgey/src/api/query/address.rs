@@ -60,7 +60,7 @@ pub async fn rir(
     match state.diglett.rir(address, query.top).await {
         Ok(rir) => match rir {
             Some(rir) => Ok(Json(ValueResponse {
-                value: Some(rir.to_string()),
+                value: Some(rir.id().to_string()),
             })),
             None => Ok(Json(ValueResponse { value: None })),
         },

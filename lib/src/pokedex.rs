@@ -1,12 +1,14 @@
 use reqwest::{StatusCode, Url};
 use serde::Deserialize;
 
+#[derive(Clone)]
 pub struct PokedexConfig {
     pub unit: PokedexUnitConfig,
     pub address: String,
     pub port: Option<u16>,
 }
 
+#[derive(Clone)]
 pub struct PokedexUnitConfig {
     pub username: String,
     pub password: String,

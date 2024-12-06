@@ -1,58 +1,94 @@
-use std::{collections::HashMap, net::Ipv4Addr};
-
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, net::Ipv4Addr};
+use uuid::Uuid;
 
-use crate::types::Rir;
+use crate::types::{AllocationState, Rir};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PidgeyCommand {
     Register,
     Deregister,
+    Query {
+        id: Uuid,
+        address: Ipv4Addr,
+        ports_start: Option<u16>,
+        ports_end: Option<u16>,
+    },
     AllocationState {
+        id: Uuid,
         address: Ipv4Addr,
     },
-    AllocationStateRes {
-        value: String,
-    },
     Rir {
+        id: Uuid,
         address: Ipv4Addr,
         top: bool,
     },
-    RirRes {
-        value: Option<Rir>,
-    },
     Asn {
+        id: Uuid,
         address: Ipv4Addr,
-    },
-    AsnRes {
-        value: Option<u32>,
     },
     Country {
+        id: Uuid,
         address: Ipv4Addr,
-    },
-    CountryRes {
-        value: Option<String>,
     },
     Online {
+        id: Uuid,
         address: Ipv4Addr,
     },
-    OnlineRes {
-        value: bool,
-        reason: Option<String>,
+    Port {
+        id: Uuid,
+        address: Ipv4Addr,
+        port: u16,
     },
     PortRange {
+        id: Uuid,
         address: Ipv4Addr,
         start: Option<u16>,
         end: Option<u16>,
     },
-    PortRangeRes {
-        value: HashMap<u16, bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum PidgeyCommandResponse {
+    Register,
+    Deregister,
+    Query {
+        id: Uuid,
+        allocation_state: AllocationState,
+        top_rir: Option<Rir>,
+        rir: Option<Rir>,
+        asn: Option<u32>,
+        country: Option<String>,
+        online: bool,
+        ports: Option<HashMap<u16, bool>>,
+    },
+    AllocationState {
+        id: Uuid,
+        value: AllocationState,
+    },
+    Rir {
+        id: Uuid,
+        value: Option<Rir>,
+    },
+    Asn {
+        id: Uuid,
+        value: Option<u32>,
+    },
+    Country {
+        id: Uuid,
+        value: Option<String>,
+    },
+    Online {
+        id: Uuid,
+        value: bool,
+        reason: Option<String>,
     },
     Port {
-        address: Ipv4Addr,
-        port: u16,
-    },
-    PortRes {
+        id: Uuid,
         value: bool,
+    },
+    PortRange {
+        id: Uuid,
+        value: HashMap<u16, bool>,
     },
 }

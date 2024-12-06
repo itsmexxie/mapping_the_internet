@@ -17,7 +17,11 @@ use tracing::{error, info};
 extern crate concat_string;
 
 pub mod api;
+pub mod db;
+pub mod models;
 pub mod pidgey;
+pub mod scanner;
+pub mod schema;
 
 #[tokio::main]
 async fn main() {
@@ -100,7 +104,22 @@ async fn main() {
     });
 
     // Pidgey handler
-    let pidgey = Arc::new(RwLock::new(Pidgey::new()));
+    let pidgey = Arc::new(Pidgey::new());
+
+    // Scanner
+    let scanner_task_token = task_token.clone();
+    let scanner_config = config.clone();
+    let scanner_pidgey = pidgey.clone();
+    task_tracker.spawn(async move {
+        tokio::select! {
+            () = scanner::run(scanner_config, scanner_pidgey) => {
+                info!("Scanner task exited on its own!");
+            }
+            () = scanner_task_token.cancelled() => {
+                info!("Scanner task cancelled succesfully!");
+            }
+        }
+    });
 
     // Axum API
     let axum_task_token = task_token.clone();

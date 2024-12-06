@@ -1,8 +1,12 @@
 use std::{fmt::Display, str::FromStr};
 
+#[cfg(feature = "diesel")]
+use diesel::{
+    backend::Backend, deserialize::FromSql, expression::AsExpression, serialize::ToSql, sql_types,
+};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum AllocationState {
     Unknown,
     Reserved,
@@ -52,8 +56,9 @@ impl FromStr for AllocationState {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "diesel", derive(AsExpression))]
+#[cfg_attr(feature = "diesel", diesel(sql_type = diesel::sql_types::Text))]
 pub enum Rir {
-    Unknown,
     Arin,
     Ripencc,
     Apnic,
@@ -63,15 +68,14 @@ pub enum Rir {
 }
 
 impl Rir {
-    pub fn id(&self) -> String {
+    pub fn id(&self) -> &str {
         match self {
-            Rir::Unknown => String::from("unknown"),
-            Rir::Arin => String::from("arin"),
-            Rir::Ripencc => String::from("ripencc"),
-            Rir::Apnic => String::from("apnic"),
-            Rir::Lacnic => String::from("lacnic"),
-            Rir::Afrinic => String::from("afrinic"),
-            Rir::Other => String::from("other"),
+            Rir::Arin => "arin",
+            Rir::Ripencc => "ripencc",
+            Rir::Apnic => "apnic",
+            Rir::Lacnic => "lacnic",
+            Rir::Afrinic => "afrinic",
+            Rir::Other => "other",
         }
     }
 }
@@ -79,7 +83,6 @@ impl Rir {
 impl Display for Rir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Rir::Unknown => "Unknown",
             Rir::Arin => "ARIN",
             Rir::Ripencc => "RIPE NCC",
             Rir::Apnic => "APNIC",
@@ -87,6 +90,37 @@ impl Display for Rir {
             Rir::Afrinic => "AfriNIC",
             Rir::Other => "Other",
         })
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl<DB> FromSql<diesel::sql_types::Text, DB> for Rir
+where
+    DB: Backend,
+    String: FromSql<diesel::sql_types::Text, DB>,
+{
+    #[allow(unsafe_code)] // ptr dereferencing
+    fn from_sql(bytes: DB::RawValue<'_>) -> diesel::deserialize::Result<Self> {
+        match Rir::from_str(&String::from_sql(bytes)?) {
+            Ok(rir) => Ok(rir),
+            Err(error) => {
+                Err(format!("Error while parsing RIR from database! ({:?})", error).into())
+            }
+        }
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl<DB> ToSql<sql_types::Text, DB> for Rir
+where
+    DB: Backend,
+    str: ToSql<sql_types::Text, DB>,
+{
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, DB>,
+    ) -> diesel::serialize::Result {
+        (self.id()).to_sql(out)
     }
 }
 

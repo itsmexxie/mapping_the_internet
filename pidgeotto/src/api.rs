@@ -18,10 +18,10 @@ pub mod ws;
 pub struct AppState {
     pub config: Arc<Config>,
     pub jwt_keys: Arc<JWTKeys>,
-    pub pidgey: Arc<RwLock<Pidgey>>,
+    pub pidgey: Arc<Pidgey>,
 }
 
-pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, pidgey: Arc<RwLock<Pidgey>>) {
+pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, pidgey: Arc<Pidgey>) {
     let app_state = AppState {
         config: config.clone(),
         jwt_keys,

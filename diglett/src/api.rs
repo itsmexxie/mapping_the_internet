@@ -11,8 +11,8 @@ use axum::{
     Json, Router,
 };
 use config::Config;
-use mtilib::types::{AllocationState, Rir};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use mtilib::types::AllocationState;
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -69,7 +69,7 @@ async fn get_rir(
     Path(address): Path<String>,
     Query(query): Query<RirQuery>,
     State(state): State<AppState>,
-) -> Result<Json<ValueResponse<String>>, StatusCode> {
+) -> Result<Json<ValueResponse<Option<String>>>, StatusCode> {
     match Ipv4Addr::from_str(address.trim()) {
         Ok(address) => {
             let address_bits: u32 = address.into();
@@ -79,7 +79,7 @@ async fn get_rir(
                 for entry in state.providers.read().await.thyme.rir.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
-                            value: entry.rir.id(),
+                            value: Some(entry.rir.id()),
                         }));
                     }
                 }
@@ -89,7 +89,7 @@ async fn get_rir(
                     if address_bits >= entry.start.to_bits() && address_bits <= entry.end.to_bits()
                     {
                         return Ok(Json(ValueResponse {
-                            value: entry.rir.id(),
+                            value: Some(entry.rir.id()),
                         }));
                     }
                 }
@@ -98,15 +98,13 @@ async fn get_rir(
                 for entry in state.providers.read().await.arin.stats.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
-                            value: entry.rir.id(),
+                            value: Some(entry.rir.id()),
                         }));
                     }
                 }
             }
 
-            Ok(Json(ValueResponse {
-                value: Rir::Unknown.id(),
-            }))
+            Ok(Json(ValueResponse { value: None }))
         }
         Err(_) => Err(StatusCode::BAD_REQUEST),
     }

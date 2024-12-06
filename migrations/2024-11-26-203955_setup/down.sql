@@ -1,6 +1,6 @@
 -- This file should undo anything in `up.sql`
 CREATE TABLE "addressallocationstates"(
-	"id" INT4 NOT NULL PRIMARY KEY,
+	"id" VARCHAR(16) NOT NULL PRIMARY KEY,
 	"name" VARCHAR(255) NOT NULL
 );
 
@@ -15,13 +15,15 @@ CREATE TABLE "addressservers"(
 
 CREATE TABLE "addresses"(
 	"id" INET NOT NULL PRIMARY KEY,
-	"allocation_state_id" INT4 NOT NULL,
+	"allocation_state_id" VARCHAR(16) NOT NULL,
 	"allocation_state_comment" VARCHAR(255),
 	"routed" BOOL NOT NULL,
 	"online" BOOL NOT NULL,
-	"top_rir_id" VARCHAR(16),
-	"rir_id" VARCHAR(16),
+	"top_rir_id" VARCHAR(16) NOT NULL,
+	"rir_id" VARCHAR(16) NOT NULL,
 	"asn_id" INT4,
+	"ports" INT4[] DEFAULT '{}' NOT NULL,
+	"country" VARCHAR(3),
 	FOREIGN KEY ("allocation_state_id") REFERENCES "AddressAllocationStates"("id"),
 	FOREIGN KEY ("top_rir_id") REFERENCES "Rirs"("id"),
 	FOREIGN KEY ("rir_id") REFERENCES "Rirs"("id"),

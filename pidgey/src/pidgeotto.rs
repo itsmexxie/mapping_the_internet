@@ -4,8 +4,10 @@ use std::sync::Arc;
 use axum::http::HeaderValue;
 use config::Config;
 use futures::{SinkExt, StreamExt};
-use mtilib::pidgey::PidgeyCommand;
+use mtilib::pidgey::{PidgeyCommand, PidgeyCommandResponse};
+use mtilib::types::AllocationState;
 use surge_ping::SurgeError;
+use tokio::sync::Semaphore;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info};
@@ -13,7 +15,12 @@ use tracing::{debug, error, info};
 use crate::diglett::Diglett;
 use crate::gust::Gust;
 
-pub async fn run(config: Arc<Config>, jwt: Arc<String>, diglett: Arc<Diglett>) {
+pub async fn run(
+    config: Arc<Config>,
+    worker_permits: Arc<Semaphore>,
+    jwt: Arc<String>,
+    diglett: Arc<Diglett>,
+) {
     if !config.get_bool("pidgeotto.connect").unwrap() {
         info!("pidgeotto.connect set to false, not connecting!");
         return;
@@ -47,158 +54,273 @@ pub async fn run(config: Arc<Config>, jwt: Arc<String>, diglett: Arc<Diglett>) {
 
     ws_write
         .send(tokio_tungstenite::tungstenite::Message::Text(
-            serde_json::to_string(&PidgeyCommand::Register).unwrap(),
+            serde_json::to_string(&PidgeyCommandResponse::Register).unwrap(),
         ))
         .await
         .unwrap();
 
+    let max_workers = match config.get_int("settings.max_workers") {
+        Ok(max) => max as usize,
+        Err(_) => crate::MAX_WORKERS,
+    };
+    let (response_tx, mut response_rx) =
+        tokio::sync::mpsc::channel::<PidgeyCommandResponse>(max_workers);
+
     tokio::spawn(async move {
-        while let Some(Ok(message)) = ws_read.next().await {
+        while let Some(response) = response_rx.recv().await {
+            ws_write
+                .send(Message::Text(serde_json::to_string(&response).unwrap()))
+                .await
+                .unwrap();
+        }
+    });
+
+    while let Some(Ok(message)) = ws_read.next().await {
+        let cloned_config = config.clone();
+        let cloned_worker_permits = worker_permits.clone();
+        let cloned_diglett = diglett.clone();
+        let cloned_response_tx = response_tx.clone();
+        tokio::spawn(async move {
             debug!("Received message {}", message);
             match message {
                 tokio_tungstenite::tungstenite::Message::Text(t) => {
                     match serde_json::from_str::<PidgeyCommand>(&t) {
                         Ok(command) => match command {
-                            PidgeyCommand::AllocationState { address } => ws_write
-                                .send(Message::Text(
-                                    serde_json::to_string(&PidgeyCommand::AllocationStateRes {
-                                        value: diglett
+                            PidgeyCommand::Register => {}
+                            PidgeyCommand::Deregister => {}
+                            PidgeyCommand::Query {
+                                id,
+                                address,
+                                ports_start,
+                                ports_end,
+                            } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+
+                                let alloc_state =
+                                    cloned_diglett.allocation_state(address).await.unwrap();
+                                let top_rir = cloned_diglett.rir(address, true).await.unwrap();
+                                let rir = cloned_diglett.rir(address, false).await.unwrap();
+                                let asn = cloned_diglett.asn(address).await.unwrap();
+                                let country = cloned_diglett.country(address).await.unwrap();
+
+                                if alloc_state == AllocationState::Reserved
+                                    || alloc_state == AllocationState::Unallocated
+                                {
+                                    cloned_response_tx
+                                        .send(PidgeyCommandResponse::Query {
+                                            id,
+                                            allocation_state: alloc_state,
+                                            top_rir,
+                                            rir,
+                                            asn,
+                                            country,
+                                            online: false,
+                                            ports: None,
+                                        })
+                                        .await
+                                        .unwrap();
+                                } else {
+                                    let payload = [0; 8];
+                                    let online =
+                                        match surge_ping::ping(IpAddr::V4(address), &payload).await
+                                        {
+                                            Ok(_) => true,
+                                            Err(ping_error) => match ping_error {
+                                                SurgeError::Timeout { seq: _ } => false,
+                                                _ => false,
+                                            },
+                                        };
+
+                                    let gust = Arc::new(Gust::new(address).unwrap());
+
+                                    let gust_range_start = match ports_start {
+                                        Some(start) => start,
+                                        None => match cloned_config
+                                            .get_int("settings.gust.range.start")
+                                        {
+                                            Ok(start) => start as u16,
+                                            Err(_) => 1,
+                                        },
+                                    };
+
+                                    let gust_range_end = match ports_end {
+                                        Some(end) => end,
+                                        None => {
+                                            match cloned_config.get_int("settings.gust.range.end") {
+                                                Ok(end) => end as u16,
+                                                Err(_) => 999,
+                                            }
+                                        }
+                                    };
+
+                                    let ports = gust
+                                        .attack_range(
+                                            gust_range_start..=gust_range_end,
+                                            cloned_config
+                                                .get_int("settings.gust.timeout")
+                                                .unwrap_or(10)
+                                                as u32,
+                                        )
+                                        .await
+                                        .unwrap();
+
+                                    cloned_response_tx
+                                        .send(PidgeyCommandResponse::Query {
+                                            id,
+                                            allocation_state: alloc_state,
+                                            top_rir,
+                                            rir,
+                                            asn,
+                                            country,
+                                            online,
+                                            ports: Some(ports),
+                                        })
+                                        .await
+                                        .unwrap();
+                                }
+                            }
+                            PidgeyCommand::AllocationState { id, address } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::AllocationState {
+                                        id,
+                                        value: cloned_diglett
                                             .allocation_state(address)
                                             .await
-                                            .unwrap()
-                                            .to_string(),
+                                            .unwrap(),
                                     })
-                                    .unwrap(),
-                                ))
-                                .await
-                                .unwrap(),
-                            PidgeyCommand::Rir { address, top } => ws_write
-                                .send(Message::Text(
-                                    serde_json::to_string(&PidgeyCommand::RirRes {
-                                        value: diglett.rir(address, top).await.unwrap(),
+                                    .await
+                                    .unwrap()
+                            }
+                            PidgeyCommand::Rir { id, address, top } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::Rir {
+                                        id,
+                                        value: cloned_diglett.rir(address, top).await.unwrap(),
                                     })
-                                    .unwrap(),
-                                ))
-                                .await
-                                .unwrap(),
-                            PidgeyCommand::Asn { address } => ws_write
-                                .send(Message::Text(
-                                    serde_json::to_string(&PidgeyCommand::AsnRes {
-                                        value: diglett.asn(address).await.unwrap(),
+                                    .await
+                                    .unwrap()
+                            }
+                            PidgeyCommand::Asn { id, address } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::Asn {
+                                        value: cloned_diglett.asn(address).await.unwrap(),
+                                        id,
                                     })
-                                    .unwrap(),
-                                ))
-                                .await
-                                .unwrap(),
-                            PidgeyCommand::Country { address } => ws_write
-                                .send(Message::Text(
-                                    serde_json::to_string(&PidgeyCommand::CountryRes {
-                                        value: diglett.country(address).await.unwrap(),
+                                    .await
+                                    .unwrap()
+                            }
+                            PidgeyCommand::Country { id, address } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::Country {
+                                        value: cloned_diglett.country(address).await.unwrap(),
+                                        id,
                                     })
-                                    .unwrap(),
-                                ))
-                                .await
-                                .unwrap(),
-                            PidgeyCommand::Online { address } => {
+                                    .await
+                                    .unwrap()
+                            }
+                            PidgeyCommand::Online { id, address } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
                                 let payload = [0; 8];
                                 let cmd =
                                     match surge_ping::ping(IpAddr::V4(address), &payload).await {
-                                        Ok(_) => &PidgeyCommand::OnlineRes {
+                                        Ok(_) => PidgeyCommandResponse::Online {
+                                            id,
                                             value: true,
                                             reason: None,
                                         },
                                         Err(ping_error) => match ping_error {
                                             SurgeError::Timeout { seq: _ } => {
-                                                &PidgeyCommand::OnlineRes {
+                                                PidgeyCommandResponse::Online {
+                                                    id,
                                                     value: false,
                                                     reason: Some(String::from("timeout")),
                                                 }
                                             }
-                                            _ => &PidgeyCommand::OnlineRes {
+                                            _ => PidgeyCommandResponse::Online {
+                                                id,
                                                 value: false,
                                                 reason: Some(String::from("unknown")),
                                             },
                                         },
                                     };
 
-                                ws_write
-                                    .send(Message::Text(serde_json::to_string(&cmd).unwrap()))
+                                cloned_response_tx.send(cmd).await.unwrap()
+                            }
+                            PidgeyCommand::Port { id, address, port } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
+                                let gust = Gust::new(address).unwrap();
+                                let port_online = gust
+                                    .attack(
+                                        port,
+                                        cloned_config.get_int("settings.gust.timeout").unwrap_or(5)
+                                            as u32,
+                                    )
+                                    .await;
+
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::Port {
+                                        value: port_online,
+                                        id,
+                                    })
                                     .await
                                     .unwrap()
                             }
                             PidgeyCommand::PortRange {
+                                id,
                                 address,
                                 start,
                                 end,
                             } => {
+                                let _permit = cloned_worker_permits.acquire().await.unwrap();
                                 let gust = Arc::new(Gust::new(address).unwrap());
 
                                 let gust_range_start = match start {
                                     Some(start) => start,
-                                    None => match config.get_int("settings.gust.range.start") {
-                                        Ok(start) => start as u16,
-                                        Err(_) => 1,
-                                    },
+                                    None => {
+                                        match cloned_config.get_int("settings.gust.range.start") {
+                                            Ok(start) => start as u16,
+                                            Err(_) => 1,
+                                        }
+                                    }
                                 };
 
                                 let gust_range_end = match end {
                                     Some(end) => end,
-                                    None => match config.get_int("settings.gust.range.end") {
-                                        Ok(end) => end as u16,
-                                        Err(_) => 999,
-                                    },
+                                    None => {
+                                        match cloned_config.get_int("settings.gust.range.end") {
+                                            Ok(end) => end as u16,
+                                            Err(_) => 999,
+                                        }
+                                    }
                                 };
 
                                 let ports_online = gust
                                     .attack_range(
                                         gust_range_start..=gust_range_end,
-                                        config.get_int("settings.gust.timeout").unwrap_or(10)
+                                        cloned_config.get_int("settings.gust.timeout").unwrap_or(10)
                                             as u32,
                                     )
                                     .await
                                     .unwrap();
 
-                                ws_write
-                                    .send(Message::Text(
-                                        serde_json::to_string(&PidgeyCommand::PortRangeRes {
-                                            value: ports_online,
-                                        })
-                                        .unwrap(),
-                                    ))
+                                cloned_response_tx
+                                    .send(PidgeyCommandResponse::PortRange {
+                                        id,
+                                        value: ports_online,
+                                    })
                                     .await
                                     .unwrap()
                             }
-                            PidgeyCommand::Port { address, port } => {
-                                let gust = Gust::new(address).unwrap();
-                                let port_online = gust
-                                    .attack(
-                                        port,
-                                        config.get_int("settings.gust.timeout").unwrap_or(5) as u32,
-                                    )
-                                    .await;
-
-                                ws_write
-                                    .send(Message::Text(
-                                        serde_json::to_string(&PidgeyCommand::PortRes {
-                                            value: port_online,
-                                        })
-                                        .unwrap(),
-                                    ))
-                                    .await
-                                    .unwrap()
-                            }
-                            _ => {}
                         },
                         Err(error) => error!("{}", error),
                     }
                 }
-                tokio_tungstenite::tungstenite::Message::Close(_) => {
-                    break;
-                }
                 _ => {}
             }
-        }
-    })
-    .await
-    .unwrap();
+        });
+    }
 }

@@ -12,7 +12,7 @@ paths:
         - $ref: "#/components/parameters/addressParam"
       responses:
         200:
-          description: "Allocation state (one of Unknown, Reserved, Unallocated, Allocated)"
+          description: "Allocation state (one of unknown, reserved, unallocated, allocated)"
           content:
             application/json:
               schema:
@@ -31,10 +31,9 @@ paths:
           in: query
           schema:
             type: boolean
-
       responses:
         200:
-          description: "RIR name (one of arin, ripencc, apnic, lacnic, afrinic, other) or unknown if no RIR found"
+          description: "RIR name (one of arin, ripencc, apnic, lacnic, afrinic, other) or null if no RIR found"
           content:
             application/json:
               schema:

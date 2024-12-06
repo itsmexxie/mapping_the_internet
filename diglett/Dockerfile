@@ -8,8 +8,6 @@
 #############
 FROM rust:latest AS builder
 
-RUN apt update
-
 WORKDIR /diglett
 COPY ./diglett .
 COPY ./lib /lib
