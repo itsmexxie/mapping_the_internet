@@ -13,7 +13,6 @@ use futures::{SinkExt, StreamExt};
 use jsonwebtoken::{DecodingKey, Validation};
 use mtilib::{auth::JWTClaims, pidgey::PidgeyCommandResponse};
 use tokio::sync::Mutex;
-use tracing::debug;
 use uuid::Uuid;
 
 use crate::pidgey::{PidgeyUnit, PidgeyUnitRequest, PidgeyUnitResponse};

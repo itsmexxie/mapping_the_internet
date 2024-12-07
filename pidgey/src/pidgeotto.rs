@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
 
@@ -46,9 +47,13 @@ pub async fn run(
     );
 
     // Connect to Pidgeotto
-    let (ws_stream, _) = connect_async(pidgeotto_req)
-        .await
-        .expect("Failed to establish a websocket connection to Pidgeotto!");
+    let (ws_stream, _) = match connect_async(pidgeotto_req).await {
+        Ok(a) => {
+            info!("Successfully established a websocket connection to a Pidgeotto instance!");
+            a
+        }
+        Err(_) => panic!("Failed to establish a websocket connection to Pidgeotto!"),
+    };
 
     let (mut ws_write, mut ws_read) = ws_stream.split();
 
@@ -96,12 +101,46 @@ pub async fn run(
                             } => {
                                 let _permit = cloned_worker_permits.acquire().await.unwrap();
 
-                                let alloc_state =
-                                    cloned_diglett.allocation_state(address).await.unwrap();
-                                let top_rir = cloned_diglett.rir(address, true).await.unwrap();
-                                let rir = cloned_diglett.rir(address, false).await.unwrap();
-                                let asn = cloned_diglett.asn(address).await.unwrap();
-                                let country = cloned_diglett.country(address).await.unwrap();
+                                let alloc_state = match cloned_diglett.allocation_state(address).await {
+									Ok(alloc_state) => alloc_state,
+									Err(status) => panic!(
+                                        "Panicked while retrieving allocation state for address {}! (status: {})",
+                                        address,
+										status
+                                    ),
+								};
+                                let top_rir = match cloned_diglett.rir(address, true).await {
+									Ok(rir) => rir,
+									Err(status) => panic!(
+                                        "Panicked while retrieving top RIR for address {}! (status: {})",
+                                        address,
+										status
+                                    ),
+								};
+                                let rir = match cloned_diglett.rir(address, false).await {
+									Ok(rir) => rir,
+									Err(status) => panic!(
+                                        "Panicked while retrieving rir for address {}! (status: {})",
+                                        address,
+										status
+                                    ),
+								};
+                                let asn = match cloned_diglett.asn(address).await {
+									Ok(asn) => asn,
+									Err(status) => panic!(
+                                        "Panicked while retrieving AS number for address {}! (status: {})",
+                                        address,
+										status
+                                    ),
+								};
+                                let country = match cloned_diglett.country(address).await {
+									Ok(country) => country,
+									Err(status) => panic!(
+                                        "Panicked while retrieving country for address {}! (status: {})",
+                                        address,
+										status
+                                    ),
+								};
 
                                 if alloc_state == AllocationState::Reserved
                                     || alloc_state == AllocationState::Unallocated
@@ -124,45 +163,48 @@ pub async fn run(
                                     let online =
                                         match surge_ping::ping(IpAddr::V4(address), &payload).await
                                         {
-                                            Ok(_) => true,
-                                            Err(ping_error) => match ping_error {
-                                                SurgeError::Timeout { seq: _ } => false,
-                                                _ => false,
-                                            },
+                                            Ok(_) => {
+                                                println!("{}", true);
+                                                true
+                                            }
+                                            Err(ping_error) => {
+                                                println!("{}", ping_error);
+                                                false
+                                            }
                                         };
 
-                                    let gust = Arc::new(Gust::new(address).unwrap());
+                                    // let gust = Arc::new(Gust::new(address).unwrap());
 
-                                    let gust_range_start = match ports_start {
-                                        Some(start) => start,
-                                        None => match cloned_config
-                                            .get_int("settings.gust.range.start")
-                                        {
-                                            Ok(start) => start as u16,
-                                            Err(_) => 1,
-                                        },
-                                    };
+                                    // let gust_range_start = match ports_start {
+                                    //     Some(start) => start,
+                                    //     None => match cloned_config
+                                    //         .get_int("settings.gust.range.start")
+                                    //     {
+                                    //         Ok(start) => start as u16,
+                                    //         Err(_) => 1,
+                                    //     },
+                                    // };
 
-                                    let gust_range_end = match ports_end {
-                                        Some(end) => end,
-                                        None => {
-                                            match cloned_config.get_int("settings.gust.range.end") {
-                                                Ok(end) => end as u16,
-                                                Err(_) => 999,
-                                            }
-                                        }
-                                    };
+                                    // let gust_range_end = match ports_end {
+                                    //     Some(end) => end,
+                                    //     None => {
+                                    //         match cloned_config.get_int("settings.gust.range.end") {
+                                    //             Ok(end) => end as u16,
+                                    //             Err(_) => 999,
+                                    //         }
+                                    //     }
+                                    // };
 
-                                    let ports = gust
-                                        .attack_range(
-                                            gust_range_start..=gust_range_end,
-                                            cloned_config
-                                                .get_int("settings.gust.timeout")
-                                                .unwrap_or(10)
-                                                as u32,
-                                        )
-                                        .await
-                                        .unwrap();
+                                    // let ports = gust
+                                    //     .attack_range(
+                                    //         gust_range_start..=gust_range_end,
+                                    //         cloned_config
+                                    //             .get_int("settings.gust.timeout")
+                                    //             .unwrap_or(10)
+                                    //             as u32,
+                                    //     )
+                                    //     .await
+                                    //     .unwrap();
 
                                     cloned_response_tx
                                         .send(PidgeyCommandResponse::Query {
@@ -173,7 +215,7 @@ pub async fn run(
                                             asn,
                                             country,
                                             online,
-                                            ports: Some(ports),
+                                            ports: Some(HashMap::new()),
                                         })
                                         .await
                                         .unwrap();

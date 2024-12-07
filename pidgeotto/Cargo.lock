@@ -1139,11 +1139,13 @@ dependencies = [
 name = "mtilib"
 version = "0.1.0"
 dependencies = [
+ "config",
  "diesel",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
+ "url",
  "uuid",
 ]
 

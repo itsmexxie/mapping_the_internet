@@ -40,7 +40,7 @@ pub async fn allocation(
 ) -> Result<Json<ValueResponse<String>>, StatusCode> {
     match state.diglett.allocation_state(address).await {
         Ok(state) => Ok(Json(ValueResponse {
-            value: state.to_string(),
+            value: state.id().to_string(),
         })),
         Err(status) => Err(status),
     }

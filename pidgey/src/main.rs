@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use config::Config;
 use diglett::Diglett;
-use mtilib::pokedex::{PokedexConfig, PokedexUnitConfig};
+use mtilib::pokedex::{config::PokedexConfig, Pokedex};
 use tokio::{
     signal::{self, unix::SignalKind},
-    sync::Semaphore,
+    sync::{Mutex, Semaphore},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
@@ -35,24 +35,21 @@ async fn main() {
     );
 
     // Login to Pokedex
-    let unit_username = config
-        .get_string("unit.username")
-        .expect("unit.username must be set!");
-    let unit_password = config
-        .get_string("unit.password")
-        .expect("unit.password must be set!");
-    let pokedex_address = config
-        .get_string("pokedex.address")
-        .expect("pokedex.address must be set!");
-    let pokedex_unit_config = PokedexUnitConfig::new(&unit_username, &unit_password);
-    let pokedex_config = Arc::new(PokedexConfig::new(pokedex_unit_config, &pokedex_address));
 
-    let jwt = match mtilib::pokedex::login(&pokedex_config).await {
+    // Login to Pokedex
+    let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
+        &config,
+    ))));
+
+    let jwt = match pokedex.lock().await.login().await {
         Ok(token) => {
             info!("Successfully logged into Pokedex!");
             Arc::new(token)
         }
-        Err(error) => return error!(error),
+        Err(error) => {
+            error!(error);
+            panic!()
+        }
     };
 
     // Tokio setup
@@ -68,7 +65,7 @@ async fn main() {
     // Graceful shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
-    let signal_pokedex_config = pokedex_config.clone();
+    let signal_task_pokedex = pokedex.clone();
     let signal_task_jwt = jwt.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
@@ -76,8 +73,7 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        // Logout of Pokedex
-                        mtilib::pokedex::logout(&signal_pokedex_config, &signal_task_jwt).await;
+                        signal_task_pokedex.lock().await.logout(&signal_task_jwt).await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -91,7 +87,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                mtilib::pokedex::logout(&signal_pokedex_config, &signal_task_jwt).await;
+                signal_task_pokedex.lock().await.logout(&signal_task_jwt).await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks
@@ -102,7 +98,7 @@ async fn main() {
     });
 
     // Services setup
-    let diglett = Arc::new(Diglett::new(&config, &pokedex_config).await);
+    let diglett = Arc::new(Diglett::new(&config, pokedex).await);
 
     // Axum API task
     let axum_task_token = task_token.clone();

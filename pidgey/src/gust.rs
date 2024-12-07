@@ -65,7 +65,9 @@ impl Gust {
             port_tasks.push(tokio::spawn(async move {
                 let result = cloned_gust.attack(port, cloned_timeout).await;
 
-                cloned_ports.lock().await.insert(port, result);
+                if result {
+                    cloned_ports.lock().await.insert(port, result);
+                }
             }));
         }
 

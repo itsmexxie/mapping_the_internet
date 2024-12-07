@@ -61,7 +61,7 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
             .collect::<Vec<_>>();
 
         let mut address_tasks = Vec::new();
-        let mut query_results = Arc::new(Mutex::new(HashMap::new()));
+        let query_results = Arc::new(Mutex::new(HashMap::new()));
 
         for address in addresses_scanning {
             if !addresses_in_db.contains(&address) {
@@ -70,12 +70,7 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                 let cloned_query_results = query_results.clone();
                 address_tasks.push(tokio::spawn(async move {
                     let _permit = cloned_task_permits.acquire().await.unwrap();
-                    debug!(
-                        "Waiting for unit to become available... (address: {})",
-                        address
-                    );
                     let unit = cloned_pidgey.get_unit().await;
-                    debug!("Unit available... (address: {})", address);
 
                     let (job_tx, job_rx) = tokio::sync::oneshot::channel::<PidgeyUnitResponse>();
 
@@ -85,7 +80,6 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                         std::net::IpAddr::V6(_) => panic!("This should never happen"),
                     };
 
-                    debug!("Scanning address {}", address);
                     unit.tx
                         .send(PidgeyUnitRequest {
                             id: uuid,
@@ -105,7 +99,6 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                         .lock()
                         .await
                         .insert(address, job_response);
-                    debug!("Scanned address {}", address);
                 }));
             }
         }
@@ -168,39 +161,41 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
             })
             .collect::<Vec<_>>();
 
-        // Check which ASs are already in our database
-        // Unfortunate naming scheme ¯\_(ツ)_/¯
-        let curr_autsyses = new_addresses
-            .iter()
-            .filter(|x| x.asn_id.is_some())
-            .map(|x| x.asn_id.unwrap())
-            .collect::<HashSet<i32>>();
+        if !config.get_bool("settings.dry_run").unwrap_or(false) {
+            // Check which ASs are already in our database
+            // Unfortunate naming scheme ¯\_(ツ)_/¯
+            let curr_autsyses = new_addresses
+                .iter()
+                .filter(|x| x.asn_id.is_some())
+                .map(|x| x.asn_id.unwrap())
+                .collect::<HashSet<i32>>();
 
-        let autsyses_db = Asns::table
-            .select(Asn::as_select())
-            .filter(Asns::id.eq_any(&curr_autsyses))
-            .load(pg_conn)
-            .unwrap()
-            .iter()
-            .map(|x| x.id)
-            .collect::<Vec<_>>();
+            let autsyses_db = Asns::table
+                .select(Asn::as_select())
+                .filter(Asns::id.eq_any(&curr_autsyses))
+                .load(pg_conn)
+                .unwrap()
+                .iter()
+                .map(|x| x.id)
+                .collect::<Vec<_>>();
 
-        let mut new_autsyses = Vec::new();
-        for curr_autsys in curr_autsyses {
-            if !autsyses_db.contains(&curr_autsys) {
-                new_autsyses.push(Asn { id: curr_autsys });
+            let mut new_autsyses = Vec::new();
+            for curr_autsys in curr_autsyses {
+                if !autsyses_db.contains(&curr_autsys) {
+                    new_autsyses.push(Asn { id: curr_autsys });
+                }
             }
+
+            diesel::insert_into(Asns::dsl::Asns)
+                .values(new_autsyses)
+                .execute(pg_conn)
+                .unwrap();
+
+            diesel::insert_into(Addresses::dsl::Addresses)
+                .values(new_addresses)
+                .execute(pg_conn)
+                .unwrap();
         }
-
-        diesel::insert_into(Asns::dsl::Asns)
-            .values(new_autsyses)
-            .execute(pg_conn)
-            .unwrap();
-
-        diesel::insert_into(Addresses::dsl::Addresses)
-            .values(new_addresses)
-            .execute(pg_conn)
-            .unwrap();
 
         curr_address += batch;
     }

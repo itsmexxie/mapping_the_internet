@@ -6,7 +6,6 @@ use std::{
 use axum::{routing::any, Router};
 use config::Config;
 use mtilib::auth::JWTKeys;
-use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 

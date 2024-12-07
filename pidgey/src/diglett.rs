@@ -3,10 +3,11 @@ use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 
 use config::Config;
 use mtilib::{
-    pokedex::PokedexConfig,
+    pokedex::Pokedex,
     types::{AllocationState, Rir},
 };
 use rand::seq::SliceRandom;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use crate::utils::ValueResponse;
@@ -16,7 +17,7 @@ pub struct Diglett {
 }
 
 impl Diglett {
-    pub async fn new(config: &Arc<Config>, pokedex_config: &PokedexConfig) -> Self {
+    pub async fn new(config: &Arc<Config>, pokedex: Arc<Mutex<Pokedex>>) -> Self {
         let diglett_client = reqwest::Client::new();
 
         if let Ok(mut diglett_address) = config.get_string("diglett.address") {
@@ -41,7 +42,10 @@ impl Diglett {
             }
         }
 
-        let services = mtilib::pokedex::get_services(&pokedex_config)
+        let services = pokedex
+            .lock()
+            .await
+            .get_services()
             .await
             .expect("Failed to retrieve services from Pokedex!");
 
@@ -50,7 +54,10 @@ impl Diglett {
             .find(|s| s.name == "diglett")
             .expect("Failed to find the diglett service!");
 
-        let mut units = mtilib::pokedex::get_service_units(&pokedex_config, diglett_service.id)
+        let mut units = pokedex
+            .lock()
+            .await
+            .get_service_units(diglett_service.id)
             .await
             .expect("Failed to retrieve available diglett units!");
 
