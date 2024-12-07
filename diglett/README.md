@@ -21,7 +21,4 @@ docker run --rm -v ./config.toml:/config.toml -p 7090:7090 {{ IMAGE_ID }}
 
 ## TODO
 - [ ] implement automatic downloads of asn prefixes file with cron
-- [x] change rir algorithm to account for recovered addresses (via. [delegation stats](https://ftp.arin.net/pub/stats/lacnic/delegated-lacnic-latest))
-- [x] implement provider for arin stats files
-- [ ] implement provider for rdap responses (maybe inflight requests only? no static files?)
-- [x] implement provider for iana number files
+- [ ] implement auth for queries
