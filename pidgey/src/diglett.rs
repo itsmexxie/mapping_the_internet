@@ -93,9 +93,8 @@ impl Diglett {
         &self,
         address: Ipv4Addr,
     ) -> Result<AllocationState, reqwest::StatusCode> {
-        let diglett_client = reqwest::Client::new();
-
-        match diglett_client
+        match self
+            .client
             .get(concat_string!(self.url, address.to_string(), "/allocation"))
             .send()
             .await
@@ -113,14 +112,12 @@ impl Diglett {
         address: Ipv4Addr,
         top: bool,
     ) -> Result<Option<Rir>, reqwest::StatusCode> {
-        let diglett_client = reqwest::Client::new();
-
         let mut request_url = concat_string!(self.url, address.to_string(), "/rir");
         if top {
             request_url = concat_string!(request_url, "?top=true");
         }
 
-        match diglett_client.get(request_url).send().await {
+        match self.client.get(request_url).send().await {
             Ok(res) => match res.status() {
                 reqwest::StatusCode::OK => {
                     let data: ValueResponse<Option<String>> = res.json().await.unwrap();
@@ -137,9 +134,8 @@ impl Diglett {
     }
 
     pub async fn asn(&self, address: Ipv4Addr) -> Result<Option<u32>, reqwest::StatusCode> {
-        let diglett_client = reqwest::Client::new();
-
-        match diglett_client
+        match self
+            .client
             .get(concat_string!(self.url, address.to_string(), "/asn"))
             .send()
             .await
@@ -157,9 +153,8 @@ impl Diglett {
     }
 
     pub async fn country(&self, address: Ipv4Addr) -> Result<Option<String>, reqwest::StatusCode> {
-        let diglett_client = reqwest::Client::new();
-
-        match diglett_client
+        match self
+            .client
             .get(concat_string!(self.url, address.to_string(), "/country"))
             .send()
             .await
