@@ -35,8 +35,6 @@ async fn main() {
     );
 
     // Login to Pokedex
-
-    // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
         &config,
     ))));

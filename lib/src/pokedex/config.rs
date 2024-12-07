@@ -45,9 +45,14 @@ impl PokedexConfig {
         //     Err(_) => None,
         // };
         let unit_address = config.get_string("unit.address").ok();
-        let unit_port = match config.get_int("unit.port") {
-            Ok(port) => Some(port as u16),
-            Err(_) => None,
+        let unit_port = match config.get_bool("unit.announce_port").unwrap_or(false) {
+            true => Some(
+                config
+                    .get_int("api.port")
+                    .expect("api.port must be set when unit.announce_port is set to true!")
+                    as u16,
+            ),
+            false => None,
         };
 
         let pokedex_address = Url::parse(

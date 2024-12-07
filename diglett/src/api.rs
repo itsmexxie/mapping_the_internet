@@ -79,7 +79,7 @@ async fn get_rir(
                 for entry in state.providers.read().await.thyme.rir.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
-                            value: Some(entry.rir.id()),
+                            value: Some(entry.rir.id().to_string()),
                         }));
                     }
                 }
@@ -89,7 +89,7 @@ async fn get_rir(
                     if address_bits >= entry.start.to_bits() && address_bits <= entry.end.to_bits()
                     {
                         return Ok(Json(ValueResponse {
-                            value: Some(entry.rir.id()),
+                            value: Some(entry.rir.id().to_string()),
                         }));
                     }
                 }
@@ -98,7 +98,7 @@ async fn get_rir(
                 for entry in state.providers.read().await.arin.stats.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
-                            value: Some(entry.rir.id()),
+                            value: Some(entry.rir.id().to_string()),
                         }));
                     }
                 }

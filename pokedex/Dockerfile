@@ -12,7 +12,9 @@ RUN apt update
 RUN apt install libpq5 -y
 
 WORKDIR /daemon
-COPY ./pokedex/daemon .
+COPY ./pokedex/daemon/src ./src
+COPY ./pokedex/daemon/Cargo.toml .
+COPY ./pokedex/daemon/Cargo.lock .
 COPY ./lib /lib
 
 RUN cargo build --release

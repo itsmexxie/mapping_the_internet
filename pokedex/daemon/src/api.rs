@@ -4,7 +4,7 @@ use axum::{http::StatusCode, routing::post, Json, Router};
 use config::Config;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use mtilib::auth::JWTKeys;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -130,6 +130,6 @@ pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>) {
     .await
     .unwrap();
 
-    info!("[API] Listening on port {}", app_port);
+    info!("Listening on port {}", app_port);
     axum::serve(listener, app).await.unwrap();
 }

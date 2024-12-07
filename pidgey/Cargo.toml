@@ -8,7 +8,7 @@ axum = "0.7.7"
 concat-string = "1.0.1"
 config = "0.14.1"
 futures = "0.3.31"
-mtilib = { path = "../lib" }
+mtilib = { path = "../lib", features = ["config"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json"] }
 serde = { version = "1.0.215", features = ["derive"] }
