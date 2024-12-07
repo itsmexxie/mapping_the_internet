@@ -13,6 +13,7 @@ use tracing::{error, info};
 use crate::utils::ValueResponse;
 
 pub struct Diglett {
+    client: reqwest::Client,
     url: String,
 }
 
@@ -33,12 +34,11 @@ impl Diglett {
                 Ok(_) => {
                     info!("Successfully connected to a diglett instance!");
                     return Diglett {
+                        client: diglett_client,
                         url: diglett_address,
                     };
                 }
-                Err(_) => {
-                    error!("Error while connecting to configured diglett, trying to find one from Pokedex...");
-                }
+                Err(_) => {}
             }
         }
 
@@ -73,7 +73,10 @@ impl Diglett {
                             url = concat_string!(url, "/");
                         }
 
-                        return Diglett { url };
+                        return Diglett {
+                            client: diglett_client,
+                            url,
+                        };
                     }
                     Err(_) => {
                         error!("Error while connecting to configured diglett, trying another...");

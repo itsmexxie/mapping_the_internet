@@ -100,22 +100,26 @@ pub struct AppState {
 }
 
 pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>) {
-    let api_state = AppState {
+    let state = AppState {
         config: config.clone(),
         jwt_keys,
     };
 
     let app = Router::new()
+        .route("/services", get(get_services))
+        .route("/services/:service_id", get(get_service))
+        .route("/services/:service_id/units", get(get_service_units))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::auth_middleware,
+        ))
         .nest(
             "/auth",
             Router::new()
                 .route("/login", post(auth::login_index))
                 .route("/logout", post(auth::logout_index)),
         )
-        .route("/services", get(get_services))
-        .route("/services/:service_id", get(get_service))
-        .route("/services/:service_id/units", get(get_service_units))
-        .with_state(api_state)
+        .with_state(state)
         .layer(TraceLayer::new_for_http());
     let app_port = config.get("api.port").expect("api.port must be set!");
 

@@ -1,6 +1,8 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Query, Request, State},
     http::{HeaderMap, StatusCode},
+    middleware::Next,
+    response::IntoResponse,
     Json,
 };
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
@@ -12,6 +14,40 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::AppState;
 use crate::models::{NewServiceUnit, Service, ServiceUnit};
 use crate::schema::{ServiceUnits, Services};
+
+pub async fn auth_middleware(
+    headers: HeaderMap,
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Result<impl IntoResponse, StatusCode> {
+    if !headers.contains_key("authorization") {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let header_token = headers
+        .get("authorization")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(" ")
+        .collect::<Vec<&str>>();
+    if header_token.len() < 2 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    match jsonwebtoken::decode::<JWTClaims>(
+        header_token[1],
+        &DecodingKey::from_rsa_pem(&state.jwt_keys.public).unwrap(),
+        &Validation::new(Algorithm::RS512),
+    ) {
+        Ok(token) => {
+            request.extensions_mut().insert(token);
+            Ok(next.run(request).await)
+        }
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct LoginBody {

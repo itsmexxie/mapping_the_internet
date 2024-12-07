@@ -6,7 +6,7 @@ use mtilib::{
 };
 use rand::seq::IteratorRandom;
 use tokio::sync::{Notify, RwLock};
-use tracing::debug;
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -88,7 +88,7 @@ impl Pidgey {
     }
 
     pub async fn register_unit(&self, unit: PidgeyUnit) {
-        debug!("Registered unit {}", unit.id);
+        info!("Registered unit {}", unit.id);
         self.units.write().await.insert(unit.id, unit);
         self.unit_available.notify_waiters();
     }
@@ -96,11 +96,11 @@ impl Pidgey {
     pub async fn deregister_unit(&self, id: &Uuid) -> bool {
         match self.units.write().await.remove(&id) {
             Some(_) => {
-                debug!("Deregistered unit {}", id);
+                info!("Deregistered unit {}", id);
                 return true;
             }
             None => {
-                debug!("Failed to deregister unit, no unit found! (id: {})", id);
+                info!("Failed to deregister unit, no unit found! (id: {})", id);
                 return false;
             }
         }

@@ -9,7 +9,7 @@ use diesel::{ExpressionMethods, RunQueryDsl, SelectableHelper};
 use ipnetwork::{IpNetwork, Ipv4Network};
 use mtilib::pidgey::PidgeyCommand;
 use tokio::sync::{Mutex, Semaphore};
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::models::{Address, Asn};
@@ -69,36 +69,43 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                 let cloned_pidgey = pidgey.clone();
                 let cloned_query_results = query_results.clone();
                 address_tasks.push(tokio::spawn(async move {
-                    let _permit = cloned_task_permits.acquire().await.unwrap();
-                    let unit = cloned_pidgey.get_unit().await;
+                    loop {
+                        let _permit = cloned_task_permits.acquire().await.unwrap();
+                        let unit = cloned_pidgey.get_unit().await;
 
-                    let (job_tx, job_rx) = tokio::sync::oneshot::channel::<PidgeyUnitResponse>();
+                        let (job_tx, job_rx) =
+                            tokio::sync::oneshot::channel::<PidgeyUnitResponse>();
 
-                    let uuid = Uuid::new_v4();
-                    let ipaddr = match address.ip() {
-                        std::net::IpAddr::V4(ipv4_addr) => ipv4_addr,
-                        std::net::IpAddr::V6(_) => panic!("This should never happen"),
-                    };
+                        let uuid = Uuid::new_v4();
+                        let ipaddr = match address.ip() {
+                            std::net::IpAddr::V4(ipv4_addr) => ipv4_addr,
+                            std::net::IpAddr::V6(_) => panic!("This should never happen"),
+                        };
 
-                    unit.tx
-                        .send(PidgeyUnitRequest {
-                            id: uuid,
-                            command: PidgeyCommand::Query {
+                        unit.tx
+                            .send(PidgeyUnitRequest {
                                 id: uuid,
-                                address: ipaddr,
-                                ports_start: Some(1),
-                                ports_end: Some(999),
-                            },
-                            response: job_tx,
-                        })
-                        .await
-                        .unwrap();
+                                command: PidgeyCommand::Query {
+                                    id: uuid,
+                                    address: ipaddr,
+                                    ports_start: Some(1),
+                                    ports_end: Some(999),
+                                },
+                                response: job_tx,
+                            })
+                            .await
+                            .unwrap();
 
-                    let job_response = job_rx.await.unwrap();
-                    cloned_query_results
-                        .lock()
-                        .await
-                        .insert(address, job_response);
+                        match job_rx.await {
+                            Ok(response) => {
+                                cloned_query_results.lock().await.insert(address, response);
+                                break;
+                            }
+                            Err(_) => {
+                                error!("Error while querying address {}, retrying...", address)
+                            }
+                        };
+                    }
                 }));
             }
         }

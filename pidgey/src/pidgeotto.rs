@@ -163,14 +163,8 @@ pub async fn run(
                                     let online =
                                         match surge_ping::ping(IpAddr::V4(address), &payload).await
                                         {
-                                            Ok(_) => {
-                                                println!("{}", true);
-                                                true
-                                            }
-                                            Err(ping_error) => {
-                                                println!("{}", ping_error);
-                                                false
-                                            }
+                                            Ok(_) => true,
+                                            Err(_) => false,
                                         };
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
