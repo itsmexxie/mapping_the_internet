@@ -37,7 +37,7 @@ pub async fn run(
     if let Ok(pidgeotto_port) = config.get_string("pidgeotto.port") {
         pidgeotto_address = concat_string!(pidgeotto_address, ":", &pidgeotto_port);
     }
-    pidgeotto_address = concat_string!("ws://", pidgeotto_address, "/ws");
+    pidgeotto_address = concat_string!(pidgeotto_address, "/ws");
 
     // Create request
     let pidgeotto_url: url::Url = url::Url::parse(&pidgeotto_address).unwrap();
@@ -55,7 +55,10 @@ pub async fn run(
             info!("Successfully established a websocket connection to a Pidgeotto instance!");
             a
         }
-        Err(_) => panic!("Failed to establish a websocket connection to Pidgeotto!"),
+        Err(err) => panic!(
+            "Failed to establish a websocket connection to Pidgeotto! ({})",
+            err
+        ),
     };
 
     let (mut ws_write, mut ws_read) = ws_stream.split();

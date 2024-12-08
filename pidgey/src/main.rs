@@ -25,6 +25,11 @@ async fn main() {
     // Tracing
     tracing_subscriber::fmt::init();
 
+    // Something for WSS
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     // Config
     let config = Arc::new(
         Config::builder()

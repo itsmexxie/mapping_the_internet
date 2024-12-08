@@ -11,11 +11,12 @@ futures = "0.3.31"
 mtilib = { path = "../lib", features = ["config"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json"] }
+rustls = { version = "0.23.19", features = ["ring"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 surge-ping = "0.8.1"
 tokio = { version = "1.41.1", features = ["full"] }
-tokio-tungstenite = { version = "0.24.0", features = ["url"] }
+tokio-tungstenite = { version = "0.24.0", features = ["url", "rustls-tls-native-roots"] }
 tokio-util = { version = "0.7.12", features = ["rt"] }
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace"] }
