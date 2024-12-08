@@ -144,3 +144,8 @@ impl FromStr for Rir {
         }
     }
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct ValueResponse<T> {
+    pub value: T,
+}

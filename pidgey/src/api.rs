@@ -21,13 +21,20 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub worker_permits: Arc<Semaphore>,
     pub diglett: Arc<Diglett>,
+    pub ping_client: Arc<surge_ping::Client>,
 }
 
-pub async fn run(config: Arc<Config>, worker_permits: Arc<Semaphore>, diglett: Arc<Diglett>) {
+pub async fn run(
+    config: Arc<Config>,
+    worker_permits: Arc<Semaphore>,
+    diglett: Arc<Diglett>,
+    ping_client: Arc<surge_ping::Client>,
+) {
     let state = AppState {
         config: config.clone(),
         worker_permits,
         diglett,
+        ping_client,
     };
 
     let app = Router::new()

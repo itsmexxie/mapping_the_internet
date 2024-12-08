@@ -16,8 +16,10 @@ The services which we are currently using to get information are as follows:
 ### Docker
 Build with `docker build -f diglett/Dockerfile .` (must be ran from the root of this repo!). Than run the resulting image with the following command:
 ```
-docker run --rm -v ./config.toml:/config.toml -p 7090:7090 {{ IMAGE_ID }}
+docker run --rm -v ./jwt.key.pub:/jwt.key.pub -v ./config.toml:/config.toml -p 7090:7090 {{ IMAGE_ID }}
 ```
+
+The API_PORT in the docker run command must be the same one as the one you specified in the config.
 
 ## TODO
 - [ ] implement automatic downloads of asn prefixes file with cron

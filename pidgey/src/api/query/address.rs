@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
     str::FromStr,
-    sync::Arc,
 };
 
 use axum::{
@@ -13,10 +12,12 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
+use mtilib::types::ValueResponse;
+use rand::random;
 use serde::{Deserialize, Serialize};
-use surge_ping::SurgeError;
+use surge_ping::{PingIdentifier, PingSequence, SurgeError};
 
-use crate::{api::AppState, gust::Gust, utils::ValueResponse};
+use crate::{api::AppState, gust::Gust};
 
 pub async fn address_middleware(
     address: Path<String>,
@@ -96,9 +97,14 @@ pub struct OnlineResponse {
 
 pub async fn online(
     Extension(address): Extension<Ipv4Addr>,
+    State(state): State<AppState>,
 ) -> Result<Json<OnlineResponse>, StatusCode> {
     let payload = [0; 8];
-    match surge_ping::ping(IpAddr::V4(address), &payload).await {
+    let mut pinger = state
+        .ping_client
+        .pinger(IpAddr::V4(address), PingIdentifier(random()))
+        .await;
+    match pinger.ping(PingSequence(0), &payload).await {
         Ok(_) => Ok(Json(OnlineResponse {
             value: true,
             reason: None,
@@ -110,51 +116,6 @@ pub async fn online(
             })),
             _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
         },
-    }
-}
-
-#[derive(Deserialize)]
-pub struct PortRangeQuery {
-    pub start: Option<u16>,
-    pub end: Option<u16>,
-}
-
-pub async fn port_range(
-    Extension(address): Extension<Ipv4Addr>,
-    query: Query<PortRangeQuery>,
-    state: State<AppState>,
-) -> Result<Json<ValueResponse<HashMap<u16, bool>>>, StatusCode> {
-    match Gust::new(address) {
-        Ok(gust) => {
-            let gust = Arc::new(gust);
-
-            let gust_range_start = match query.start {
-                Some(start) => start,
-                None => match state.config.get_int("settings.gust.range.start") {
-                    Ok(start) => start as u16,
-                    Err(_) => 1,
-                },
-            };
-
-            let gust_range_end = match query.end {
-                Some(end) => end,
-                None => match state.config.get_int("settings.gust.range.end") {
-                    Ok(end) => end as u16,
-                    Err(_) => 999,
-                },
-            };
-
-            Ok(Json(ValueResponse {
-                value: gust
-                    .attack_range(
-                        gust_range_start..=gust_range_end,
-                        state.config.get_int("settings.gust.timeout").unwrap_or(10) as u32,
-                    )
-                    .await
-                    .unwrap(),
-            }))
-        }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -178,6 +139,52 @@ pub async fn port(
         },
         Err(_) => Err(StatusCode::BAD_REQUEST),
     }
+}
+
+#[derive(Deserialize)]
+pub struct PortRangeQuery {
+    pub start: Option<u16>,
+    pub end: Option<u16>,
+}
+
+pub async fn port_range(
+    Extension(address): Extension<Ipv4Addr>,
+    query: Query<PortRangeQuery>,
+    state: State<AppState>,
+) -> Result<Json<ValueResponse<HashMap<u16, bool>>>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+    // match Gust::new(address) {
+    //     Ok(gust) => {
+    //         let gust = Arc::new(gust);
+
+    //         let gust_range_start = match query.start {
+    //             Some(start) => start,
+    //             None => match state.config.get_int("settings.gust.range.start") {
+    //                 Ok(start) => start as u16,
+    //                 Err(_) => 1,
+    //             },
+    //         };
+
+    //         let gust_range_end = match query.end {
+    //             Some(end) => end,
+    //             None => match state.config.get_int("settings.gust.range.end") {
+    //                 Ok(end) => end as u16,
+    //                 Err(_) => 999,
+    //             },
+    //         };
+
+    //         Ok(Json(ValueResponse {
+    //             value: gust
+    //                 .attack_range(
+    //                     gust_range_start..=gust_range_end,
+    //                     state.config.get_int("settings.gust.timeout").unwrap_or(10) as u32,
+    //                 )
+    //                 .await
+    //                 .unwrap(),
+    //         }))
+    //     }
+    //     Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    // }
 }
 
 pub async fn index() -> impl IntoResponse {

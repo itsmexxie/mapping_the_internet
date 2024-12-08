@@ -8,10 +8,10 @@
 #############
 FROM rust:latest AS builder
 
-WORKDIR /diglett
-COPY ./diglett/src ./src
-COPY ./diglett/Cargo.toml .
-COPY ./diglett/Cargo.lock .
+WORKDIR /pidgey
+COPY ./pidgey/src ./src
+COPY ./pidgey/Cargo.toml .
+COPY ./pidgey/Cargo.lock .
 COPY ./lib /lib
 
 RUN cargo build --release
@@ -22,6 +22,6 @@ RUN cargo build --release
 FROM gcr.io/distroless/cc
 
 # Copy our build
-COPY --from=builder /diglett/target/release/diglett .
+COPY --from=builder /pidgey/target/release/pidgey .
 
-CMD ["/diglett"]
+CMD ["/pidgey"]

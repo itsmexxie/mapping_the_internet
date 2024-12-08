@@ -4,13 +4,11 @@ use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 use config::Config;
 use mtilib::{
     pokedex::Pokedex,
-    types::{AllocationState, Rir},
+    types::{AllocationState, Rir, ValueResponse},
 };
 use rand::seq::SliceRandom;
 use tokio::sync::Mutex;
 use tracing::{error, info};
-
-use crate::utils::ValueResponse;
 
 pub struct Diglett {
     client: reqwest::Client,

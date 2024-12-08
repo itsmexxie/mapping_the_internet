@@ -7,7 +7,8 @@ use config::Config;
 use futures::{SinkExt, StreamExt};
 use mtilib::pidgey::{PidgeyCommand, PidgeyCommandResponse};
 use mtilib::types::AllocationState;
-use surge_ping::SurgeError;
+use rand::random;
+use surge_ping::{PingIdentifier, PingSequence, SurgeError};
 use tokio::sync::Semaphore;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -21,6 +22,7 @@ pub async fn run(
     worker_permits: Arc<Semaphore>,
     jwt: Arc<String>,
     diglett: Arc<Diglett>,
+    ping_client: Arc<surge_ping::Client>,
 ) {
     if !config.get_bool("pidgeotto.connect").unwrap() {
         info!("pidgeotto.connect set to false, not connecting!");
@@ -39,6 +41,7 @@ pub async fn run(
 
     // Create request
     let pidgeotto_url: url::Url = url::Url::parse(&pidgeotto_address).unwrap();
+    println!("{}", pidgeotto_url);
     let mut pidgeotto_req = pidgeotto_url.into_client_request().unwrap();
     let headers = pidgeotto_req.headers_mut();
     headers.insert(
@@ -84,6 +87,7 @@ pub async fn run(
         let cloned_config = config.clone();
         let cloned_worker_permits = worker_permits.clone();
         let cloned_diglett = diglett.clone();
+        let cloned_ping_client = ping_client.clone();
         let cloned_response_tx = response_tx.clone();
         tokio::spawn(async move {
             debug!("Received message {}", message);
@@ -96,8 +100,8 @@ pub async fn run(
                             PidgeyCommand::Query {
                                 id,
                                 address,
-                                ports_start,
-                                ports_end,
+                                ports_start: _,
+                                ports_end: _,
                             } => {
                                 let _permit = cloned_worker_permits.acquire().await.unwrap();
 
@@ -160,12 +164,14 @@ pub async fn run(
                                         .unwrap();
                                 } else {
                                     let payload = [0; 8];
-                                    let online =
-                                        match surge_ping::ping(IpAddr::V4(address), &payload).await
-                                        {
-                                            Ok(_) => true,
-                                            Err(_) => false,
-                                        };
+                                    let mut pinger = cloned_ping_client
+                                        .pinger(IpAddr::V4(address), PingIdentifier(random()))
+                                        .await;
+                                    let online = match pinger.ping(PingSequence(0), &payload).await
+                                    {
+                                        Ok(_) => true,
+                                        Err(_) => false,
+                                    };
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 
