@@ -1,5 +1,6 @@
 use axum::{routing::get, Router};
 use config::Config;
+use mtilib::auth::JWTKeys;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -19,6 +20,7 @@ async fn index() -> &'static str {
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    pub jwt_keys: Arc<JWTKeys>,
     pub worker_permits: Arc<Semaphore>,
     pub diglett: Arc<Diglett>,
     pub ping_client: Arc<surge_ping::Client>,
@@ -26,12 +28,14 @@ pub struct AppState {
 
 pub async fn run(
     config: Arc<Config>,
+    jwt_keys: Arc<JWTKeys>,
     worker_permits: Arc<Semaphore>,
     diglett: Arc<Diglett>,
     ping_client: Arc<surge_ping::Client>,
 ) {
     let state = AppState {
         config: config.clone(),
+        jwt_keys,
         worker_permits,
         diglett,
         ping_client,

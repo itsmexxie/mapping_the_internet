@@ -8,6 +8,7 @@ axum = "0.7.7"
 concat-string = "1.0.1"
 config = "0.14.1"
 futures = "0.3.31"
+jsonwebtoken = "9.3.0"
 mtilib = { path = "../lib", features = ["config"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json"] }

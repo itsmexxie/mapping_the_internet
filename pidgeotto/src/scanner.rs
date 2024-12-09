@@ -210,6 +210,8 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                 .unwrap();
         }
 
-        curr_address += batch;
+		if !config.get_bool("settings.cycle").unwrap_or(false) {
+			curr_address += batch;
+		}
     }
 }

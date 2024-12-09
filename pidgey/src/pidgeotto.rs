@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::http::HeaderValue;
@@ -24,7 +25,7 @@ pub async fn run(
     diglett: Arc<Diglett>,
     ping_client: Arc<surge_ping::Client>,
 ) {
-    if !config.get_bool("pidgeotto.connect").unwrap() {
+    if !config.get_bool("pidgeotto.connect").unwrap_or(true) {
         info!("pidgeotto.connect set to false, not connecting!");
         return;
     }
@@ -77,6 +78,9 @@ pub async fn run(
     let (response_tx, mut response_rx) =
         tokio::sync::mpsc::channel::<PidgeyCommandResponse>(max_workers);
 
+    // Websocket write task
+    // Can't clone the resulting ws_write from tungstenite, so only can task handles the writing to the websocket
+    // while other tasks use tokio::sync::mpsc channels to communicate with this task
     tokio::spawn(async move {
         while let Some(response) = response_rx.recv().await {
             ws_write
@@ -93,6 +97,7 @@ pub async fn run(
         let cloned_ping_client = ping_client.clone();
         let cloned_response_tx = response_tx.clone();
         tokio::spawn(async move {
+            // let targetAddress = Ipv4Addr::from_str("1.1.1.1").unwrap();
             debug!("Received message {}", message);
             match message {
                 tokio_tungstenite::tungstenite::Message::Text(t) => {
@@ -175,6 +180,10 @@ pub async fn run(
                                         Ok(_) => true,
                                         Err(_) => false,
                                     };
+
+                                    // if address == targetAddress {
+                                    //     println!("{} {}", address, online);
+                                    // }
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 

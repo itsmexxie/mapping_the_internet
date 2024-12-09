@@ -19,7 +19,7 @@ use schema::{ServiceUnits, Services};
 
 #[tokio::main]
 async fn main() {
-    // Logging
+    // Tracing
     tracing_subscriber::fmt::init();
 
     // Config
