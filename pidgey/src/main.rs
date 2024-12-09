@@ -82,14 +82,13 @@ async fn main() {
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
     let signal_task_pokedex = pokedex.clone();
-    let signal_task_jwt = jwt.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        signal_task_pokedex.lock().await.logout(&signal_task_jwt).await;
+                        signal_task_pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -103,7 +102,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout(&signal_task_jwt).await;
+                signal_task_pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks

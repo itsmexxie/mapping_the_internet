@@ -1236,7 +1236,6 @@ dependencies = [
 name = "mtilib"
 version = "0.1.0"
 dependencies = [
- "config",
  "reqwest",
  "serde",
  "serde_json",

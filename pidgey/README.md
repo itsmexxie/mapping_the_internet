@@ -17,4 +17,4 @@ The API_PORT in the docker run command must be the same one as the one you speci
 
 ## TODO
 - [ ] Pidgeotto service discovery via pokedex
-- [ ] API auth
+- [x] API auth

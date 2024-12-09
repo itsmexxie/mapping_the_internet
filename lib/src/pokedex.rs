@@ -76,13 +76,17 @@ impl Pokedex {
         }
     }
 
-    pub async fn logout(&self, token: &String) {
+    pub async fn logout(&self) {
         let mut pokedex_url = self.config.address.clone();
         pokedex_url.set_path("auth/logout");
 
         self.client
             .post(pokedex_url)
-            .bearer_auth(token)
+            .bearer_auth(
+                self.token
+                    .as_ref()
+                    .expect("Can't logout if never logged in!"),
+            )
             .send()
             .await
             .unwrap();

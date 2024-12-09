@@ -30,13 +30,15 @@ impl Diglett {
 
             match diglett_client.get(&diglett_address).send().await {
                 Ok(_) => {
-                    info!("Successfully connected to a diglett instance!");
+                    info!("Successfully connected to the configured diglett instance!");
                     return Diglett {
                         client: diglett_client,
                         url: diglett_address,
                     };
                 }
-                Err(_) => {}
+                Err(_) => {
+                    error!("Failed to connect to the configured diglett instance, trying units from Pokedex...");
+                }
             }
         }
 
