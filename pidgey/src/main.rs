@@ -21,7 +21,7 @@ pub mod diglett;
 pub mod gust;
 pub mod pidgeotto;
 
-pub const MAX_WORKERS: usize = 16;
+pub const MAX_WORKERS: usize = 64;
 
 #[tokio::main]
 async fn main() {

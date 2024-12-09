@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::http::HeaderValue;
@@ -89,6 +90,11 @@ pub async fn run(
         }
     });
 
+    let mut test_online_address = None;
+    if let Ok(test_online_addr) = config.get_string("settings.test.target_online_address") {
+        test_online_address = Some(Ipv4Addr::from_str(&test_online_addr).unwrap());
+    }
+
     while let Some(Ok(message)) = ws_read.next().await {
         let cloned_config = config.clone();
         let cloned_worker_permits = worker_permits.clone();
@@ -97,6 +103,7 @@ pub async fn run(
         let cloned_response_tx = response_tx.clone();
         tokio::spawn(async move {
             debug!("Received message {}", message);
+
             match message {
                 tokio_tungstenite::tungstenite::Message::Text(t) => {
                     match serde_json::from_str::<PidgeyCommand>(&t) {
@@ -178,6 +185,12 @@ pub async fn run(
                                         Ok(_) => true,
                                         Err(_) => false,
                                     };
+
+                                    if test_online_address.is_some() {
+                                        if address == test_online_address.unwrap() {
+                                            println!("{}: {}", address, online);
+                                        }
+                                    }
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 
