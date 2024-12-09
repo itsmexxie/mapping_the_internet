@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
-use std::str::FromStr;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use axum::http::HeaderValue;
@@ -97,7 +96,6 @@ pub async fn run(
         let cloned_ping_client = ping_client.clone();
         let cloned_response_tx = response_tx.clone();
         tokio::spawn(async move {
-            // let targetAddress = Ipv4Addr::from_str("1.1.1.1").unwrap();
             debug!("Received message {}", message);
             match message {
                 tokio_tungstenite::tungstenite::Message::Text(t) => {
@@ -180,10 +178,6 @@ pub async fn run(
                                         Ok(_) => true,
                                         Err(_) => false,
                                     };
-
-                                    // if address == targetAddress {
-                                    //     println!("{} {}", address, online);
-                                    // }
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 
