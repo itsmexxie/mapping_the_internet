@@ -9,7 +9,7 @@ use diesel::{ExpressionMethods, RunQueryDsl, SelectableHelper};
 use ipnetwork::{IpNetwork, Ipv4Network};
 use mtilib::pidgey::PidgeyCommand;
 use tokio::sync::{Mutex, Semaphore};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::models::{Address, Asn};
@@ -22,6 +22,12 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
     let task_permits = Arc::new(Semaphore::new(
         config.get_int("settings.scanner.max_tasks").unwrap_or(512) as usize,
     ));
+
+    info!(
+        "Running scanner with batch size of {} and maximum number of tasks of {}!",
+        batch,
+        task_permits.available_permits()
+    );
 
     // Query the database for records in that range
     // Query pidgeys for the missing records
