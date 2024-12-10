@@ -228,7 +228,10 @@ pub async fn run(
                                     cloned_response_tx
                                         .send(PidgeyCommandResponse::Query {
                                             id,
-                                            allocation_state: alloc_state,
+                                            allocation_state: match online {
+                                                true => AllocationState::Allocated, // If the address is online then the state must be allocated
+                                                false => alloc_state,
+                                            },
                                             top_rir,
                                             rir,
                                             asn,

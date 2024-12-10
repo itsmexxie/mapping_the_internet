@@ -50,6 +50,7 @@ impl FromStr for AllocationState {
             "available" => Ok(AllocationState::Unallocated),
             "allocated" => Ok(AllocationState::Allocated),
             "assigned" => Ok(AllocationState::Allocated), // Maybe not correct?
+            "unknown" => Ok(AllocationState::Unknown),
             _ => Err(AllocStateParseErr::UnknownState(s.to_string())),
         }
     }
