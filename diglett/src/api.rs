@@ -35,7 +35,7 @@ async fn get_allocation(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.iana.reserved.iter() {
+            for entry in state.providers.read().await.iana.reserved.value.iter() {
                 if entry.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: AllocationState::Reserved.id(),
@@ -43,7 +43,7 @@ async fn get_allocation(
                 }
             }
 
-            for entry in state.providers.read().await.arin.stats.iter() {
+            for entry in state.providers.read().await.arin.stats.value.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: entry.allocation_state.id(),
@@ -85,7 +85,7 @@ async fn get_rir(
                 }
             } else {
                 // First look up the IANA recovered addresses
-                for entry in state.providers.read().await.iana.recovered.iter() {
+                for entry in state.providers.read().await.iana.recovered.value.iter() {
                     if address_bits >= entry.start.to_bits() && address_bits <= entry.end.to_bits()
                     {
                         return Ok(Json(ValueResponse {
@@ -95,7 +95,7 @@ async fn get_rir(
                 }
 
                 // Then look up the ARIN stat files
-                for entry in state.providers.read().await.arin.stats.iter() {
+                for entry in state.providers.read().await.arin.stats.value.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
                             value: Some(entry.rir.id().to_string()),
@@ -140,7 +140,7 @@ async fn get_country(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.arin.stats.iter() {
+            for entry in state.providers.read().await.arin.stats.value.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: entry.country.to_owned(),

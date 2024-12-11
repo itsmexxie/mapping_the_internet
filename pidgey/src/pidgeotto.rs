@@ -42,7 +42,6 @@ pub async fn run(
 
     // Create request
     let pidgeotto_url: url::Url = url::Url::parse(&pidgeotto_address).unwrap();
-    println!("{}", pidgeotto_url);
     let mut pidgeotto_req = pidgeotto_url.into_client_request().unwrap();
     let headers = pidgeotto_req.headers_mut();
     headers.insert(

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use config::Config;
 use mtilib::pokedex::{config::PokedexConfig, Pokedex};
-use providers::{arin, iana, thyme};
+use providers::Providers;
 use serde::Deserialize;
 use tokio::{
     signal::{self, unix::SignalKind},
@@ -65,7 +65,7 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        signal_task_pokedex.lock().await.logout(&jwt).await;
+                        signal_task_pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -79,7 +79,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout(&jwt).await;
+                signal_task_pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks
@@ -90,19 +90,10 @@ async fn main() {
     });
 
     // Load providers
-    let providers = Arc::new(RwLock::new(providers::Providers {
-        arin: arin::Providers {
-            stats: arin::stats::load(&config).await,
-        },
-        iana: iana::Providers {
-            recovered: iana::recovered::load(&config).await,
-            reserved: iana::reserved::load(&config).await,
-        },
-        thyme: thyme::Providers {
-            asn: thyme::asn_prefixes::load(&config).await,
-            rir: thyme::rir_allocations::load(&config).await,
-        },
-    }));
+    let mut registered_providers = Vec::new();
+    let providers = Arc::new(RwLock::new(
+        Providers::register_and_load(&config, &mut registered_providers).await,
+    ));
 
     // Axum API
     let axum_token = task_token.clone();

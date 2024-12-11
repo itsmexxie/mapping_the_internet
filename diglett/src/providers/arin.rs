@@ -1,7 +1,7 @@
-use stats::StatEntry;
+use stats::StatsProvider;
 
 pub mod stats;
 
 pub struct Providers {
-    pub stats: Vec<StatEntry>,
+    pub stats: StatsProvider,
 }

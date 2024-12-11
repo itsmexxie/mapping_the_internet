@@ -1,11 +1,10 @@
-use recovered::RecoveredEntry;
-
-use crate::utils::CIDR;
+use recovered::RecoveredProvider;
+use reserved::ReservedProvider;
 
 pub mod recovered;
 pub mod reserved;
 
 pub struct Providers {
-    pub recovered: Vec<RecoveredEntry>,
-    pub reserved: Vec<CIDR>,
+    pub recovered: RecoveredProvider,
+    pub reserved: ReservedProvider,
 }

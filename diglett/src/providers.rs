@@ -8,11 +8,11 @@ use tokio::{
 };
 use tracing::{error, info};
 
+use crate::get_config_value;
+
 pub mod arin;
 pub mod iana;
 pub mod thyme;
-
-use crate::get_config_value;
 
 pub struct Providers {
     pub arin: arin::Providers,
@@ -20,8 +20,48 @@ pub struct Providers {
     pub thyme: thyme::Providers,
 }
 
+impl Providers {
+    pub async fn load(config: &Config) -> Providers {
+        Providers {
+            arin: arin::Providers {
+                stats: arin::stats::StatsProvider::load(&config).await,
+            },
+            iana: iana::Providers {
+                recovered: iana::recovered::RecoveredProvider::load(&config).await,
+                reserved: iana::reserved::ReservedProvider::load(&config).await,
+            },
+            thyme: thyme::Providers {
+                asn: thyme::asn_prefixes::load(&config).await,
+                rir: thyme::rir_allocations::load(&config).await,
+            },
+        }
+    }
+
+    pub async fn register_and_load(
+        config: &Config,
+        registered: &mut Vec<Vec<String>>,
+    ) -> Providers {
+        Providers {
+            arin: arin::Providers {
+                stats: arin::stats::StatsProvider::register_and_load(&config, registered).await,
+            },
+            iana: iana::Providers {
+                recovered: iana::recovered::RecoveredProvider::register_and_load(
+                    &config, registered,
+                )
+                .await,
+                reserved: iana::reserved::ReservedProvider::load(&config).await,
+            },
+            thyme: thyme::Providers {
+                asn: thyme::asn_prefixes::load(&config).await,
+                rir: thyme::rir_allocations::load(&config).await,
+            },
+        }
+    }
+}
+
 pub async fn download_file(config: &Config, section: &str) {
-    let url = get_config_value::<String>(config, &concat_string!(section, ".url"));
+    let url = &get_config_value::<String>(config, &concat_string!(section, ".url"));
     let filepath_cnf = &get_config_value::<String>(config, &concat_string!(section, ".filepath"));
     let filepath = Path::new(filepath_cnf);
 
@@ -33,7 +73,7 @@ pub async fn download_file(config: &Config, section: &str) {
     let client = reqwest::Client::new();
 
     let file_in = client
-        .get(&url)
+        .get(url)
         .header(USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15")
 		.send()
         .await
@@ -86,11 +126,17 @@ pub async fn check_file(config: &Config, section: &str) -> bool {
     }
 }
 
+pub async fn check_and_download(config: &Config, section: &str) {
+    if !check_file(config, &section).await {
+        download_file(config, &section).await;
+    }
+}
+
 pub async fn check_many_and_download(config: &Config, sections: &[&str]) {
     for section in sections {
         let section_str = concat_string!("providers.", section);
-        if !crate::providers::check_file(config, &section_str).await {
-            crate::providers::download_file(config, &section_str).await;
+        if !check_file(config, &section_str).await {
+            download_file(config, &section_str).await;
         }
     }
 }

@@ -36,8 +36,8 @@ impl Diglett {
                         url: diglett_address,
                     };
                 }
-                Err(_) => {
-                    error!("Failed to connect to the configured diglett instance, trying units from Pokedex...");
+                Err(err) => {
+                    error!("Failed to connect to the configured diglett instance, trying units from Pokedex... ({})", err);
                 }
             }
         }
