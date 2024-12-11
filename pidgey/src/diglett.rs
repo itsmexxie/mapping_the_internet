@@ -30,7 +30,7 @@ impl Diglett {
                         Err(_) => {}
                     };
 
-                    match diglett_client.get(&diglett_address).send().await {
+                    match diglett_client.get(diglett_url.clone()).send().await {
                         Ok(_) => {
                             info!("Successfully connected to the configured diglett instance!");
                             return Diglett {
@@ -79,7 +79,7 @@ impl Diglett {
                             None => {}
                         };
 
-                        match diglett_client.get(diglett_address).send().await {
+                        match diglett_client.get(diglett_url.clone()).send().await {
                             Ok(_) => {
                                 info!("Successfully connected to a diglett instance!");
 
