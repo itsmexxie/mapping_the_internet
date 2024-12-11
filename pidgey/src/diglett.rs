@@ -9,37 +9,44 @@ use mtilib::{
 use rand::seq::SliceRandom;
 use tokio::sync::Mutex;
 use tracing::{error, info};
+use url::Url;
 
 pub struct Diglett {
     client: reqwest::Client,
-    url: String,
+    url: Url,
 }
 
 impl Diglett {
     pub async fn new(config: &Arc<Config>, pokedex: Arc<Mutex<Pokedex>>) -> Self {
         let diglett_client = reqwest::Client::new();
 
-        if let Ok(mut diglett_address) = config.get_string("diglett.address") {
+        if let Ok(diglett_address) = config.get_string("diglett.address") {
             info!("diglett.address set, trying to connect...");
 
-            let diglett_port = match config.get_string("diglett.port") {
-                Ok(port) => port,
-                Err(_) => "".to_string(),
-            };
-            diglett_address = concat_string!(diglett_address, diglett_port);
-
-            match diglett_client.get(&diglett_address).send().await {
-                Ok(_) => {
-                    info!("Successfully connected to the configured diglett instance!");
-                    return Diglett {
-                        client: diglett_client,
-                        url: diglett_address,
+            match url::Url::parse(&diglett_address) {
+                Ok(mut diglett_url) => {
+                    match config.get_int("diglett.port") {
+                        Ok(port) => diglett_url.set_port(Some(port as u16)).unwrap(),
+                        Err(_) => {}
                     };
+
+                    match diglett_client.get(&diglett_address).send().await {
+                        Ok(_) => {
+                            info!("Successfully connected to the configured diglett instance!");
+                            return Diglett {
+                                client: diglett_client,
+                                url: diglett_url,
+                            };
+                        }
+                        Err(err) => {
+                            error!("Failed to connect to the configured diglett instance, trying units from Pokedex... ({})", err);
+                        }
+                    }
                 }
-                Err(err) => {
-                    error!("Failed to connect to the configured diglett instance, trying units from Pokedex... ({})", err);
-                }
-            }
+                Err(_) => error!(
+                    "Failed to parse configured diglett address, trying units from Pokedex..."
+                ),
+            };
         }
 
         let services = pokedex
@@ -64,29 +71,37 @@ impl Diglett {
         units.shuffle(&mut rand::thread_rng());
         let mut i = 0;
         while i < units.len() {
-            if let Some(pidgeotto_address) = &units[i].address {
-                match diglett_client.get(pidgeotto_address).send().await {
-                    Ok(_) => {
-                        info!("Successfully connected to a diglett instance!");
-                        let mut url = pidgeotto_address.to_owned();
-                        if !url.ends_with("/") {
-                            url = concat_string!(url, "/");
-                        }
-
-                        return Diglett {
-                            client: diglett_client,
-                            url,
+            if let Some(diglett_address) = &units[i].address {
+                match url::Url::parse(diglett_address) {
+                    Ok(mut diglett_url) => {
+                        match units[i].port {
+                            Some(port) => diglett_url.set_port(Some(port as u16)).unwrap(),
+                            None => {}
                         };
+
+                        match diglett_client.get(diglett_address).send().await {
+                            Ok(_) => {
+                                info!("Successfully connected to a diglett instance!");
+
+                                return Diglett {
+                                    client: diglett_client,
+                                    url: diglett_url,
+                                };
+                            }
+                            Err(_) => {
+                                error!("Error while connecting to diglett, trying another...")
+                            }
+                        }
                     }
-                    Err(_) => {
-                        error!("Error while connecting to configured diglett, trying another...");
-                    }
+                    Err(_) => error!("Failed to parse diglett address, trying another..."),
                 }
             }
             i += 1;
         }
 
-        panic!("Failed to create Diglett client, no running instances found!");
+        panic!(
+            "Failed to create Diglett client, no running or correctly configured instances found!"
+        );
     }
 
     pub async fn allocation_state(

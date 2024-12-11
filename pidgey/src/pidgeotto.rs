@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
-use std::str::FromStr;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use axum::http::HeaderValue;
@@ -31,17 +30,21 @@ pub async fn run(
     }
 
     // Get address
-    let mut pidgeotto_address = config
-        .get_string("pidgeotto.address")
-        .expect("pidgeotto.address must be set!");
+    let mut pidgeotto_url = url::Url::parse(
+        &config
+            .get_string("pidgeotto.address")
+            .expect("pidgeotto.address must be set!"),
+    )
+    .expect("Failed to parse configured pidgeotto address!");
 
-    if let Ok(pidgeotto_port) = config.get_string("pidgeotto.port") {
-        pidgeotto_address = concat_string!(pidgeotto_address, ":", &pidgeotto_port);
+    match config.get_int("pidgeotto.port") {
+        Ok(port) => pidgeotto_url.set_port(Some(port as u16)).unwrap(),
+        Err(_) => {}
     }
-    pidgeotto_address = concat_string!(pidgeotto_address, "/ws");
+
+    pidgeotto_url.set_path("/ws");
 
     // Create request
-    let pidgeotto_url: url::Url = url::Url::parse(&pidgeotto_address).unwrap();
     let mut pidgeotto_req = pidgeotto_url.into_client_request().unwrap();
     let headers = pidgeotto_req.headers_mut();
     headers.insert(
@@ -88,11 +91,6 @@ pub async fn run(
                 .unwrap();
         }
     });
-
-    let mut test_online_address = None;
-    if let Ok(test_online_addr) = config.get_string("settings.test.target_online_address") {
-        test_online_address = Some(Ipv4Addr::from_str(&test_online_addr).unwrap());
-    }
 
     while let Some(Ok(message)) = ws_read.next().await {
         let cloned_config = config.clone();
@@ -184,12 +182,6 @@ pub async fn run(
                                         Ok(_) => true,
                                         Err(_) => false,
                                     };
-
-                                    if test_online_address.is_some() {
-                                        if address == test_online_address.unwrap() {
-                                            println!("{}: {}", address, online);
-                                        }
-                                    }
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 
