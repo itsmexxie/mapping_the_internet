@@ -40,7 +40,7 @@ async fn main() {
         &config,
     ))));
 
-    let jwt = match pokedex.lock().await.login().await {
+    let _ = match pokedex.lock().await.login().await {
         Ok(token) => {
             info!("Successfully logged into Pokedex!");
             Arc::new(token)
@@ -90,10 +90,21 @@ async fn main() {
     });
 
     // Load providers
-    let mut registered_providers = Vec::new();
-    let providers = Arc::new(RwLock::new(
-        Providers::register_and_load(&config, &mut registered_providers).await,
-    ));
+    let providers = Arc::new(RwLock::new(Providers::load(&config).await));
+
+    // Scheduler task
+    // let scheduler_token = task_token.clone();
+    // let scheduler_providers = providers.clone();
+    // task_tracker.spawn(async move {
+    //     tokio::select! {
+    //         () = scheduler::run(scheduler, &mut scheduler_rx, scheduler_providers) => {
+    //             info!("Scheduler task exited on its own!");
+    //         }
+    //         () = scheduler_token.cancelled() => {
+    //             info!("Scheduler task cancelled succesfully!");
+    //         }
+    //     }
+    // });
 
     // Axum API
     let axum_token = task_token.clone();

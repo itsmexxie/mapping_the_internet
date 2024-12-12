@@ -4,9 +4,7 @@ use config::Config;
 use mtilib::types::Rir;
 use tracing::info;
 
-use crate::get_config_value;
-
-const SECTIONS: [&str; 1] = ["iana.recovered"];
+use crate::providers;
 
 pub struct RecoveredProvider {
     pub value: Vec<RecoveredEntry>,
@@ -17,48 +15,38 @@ impl RecoveredProvider {
         info!("Loading IANA recovered addresses...");
 
         // Check if we need to redownload file
-        crate::providers::check_many_and_download(config, &SECTIONS).await;
+        match providers::load_provider_sources(config, "iana.recovered") {
+            Some(sources) => {
+                providers::check_and_download(&sources).await;
 
-        // Get the configured filepath and read the file into memory
-        let section_filepath_cnf =
-            &get_config_value::<String>(config, "providers.iana.recovered.filepath");
-        let section_filepath = Path::new(section_filepath_cnf);
+                let mut recovered_entries = Vec::new();
+                for source in sources {
+                    // Get the configured filepath and read the file into memory
+                    let source_filepath = Path::new(&source.filepath);
 
-        let mut reader = csv::Reader::from_reader(std::fs::File::open(section_filepath).unwrap());
+                    let mut reader =
+                        csv::Reader::from_reader(std::fs::File::open(source_filepath).unwrap());
 
-        // Parse
-        let mut recovered_entries = Vec::new();
+                    // Parse
+                    for reader_line in reader.deserialize() {
+                        let entry: (String, String, String) = reader_line.unwrap();
 
-        for reader_line in reader.deserialize() {
-            let entry: (String, String, String) = reader_line.unwrap();
+                        recovered_entries.push(RecoveredEntry {
+                            start: Ipv4Addr::from_str(&entry.0).unwrap(),
+                            end: Ipv4Addr::from_str(&entry.1).unwrap(),
+                            rir: Rir::from_str(&entry.2).unwrap(),
+                        });
+                    }
+                }
 
-            recovered_entries.push(RecoveredEntry {
-                start: Ipv4Addr::from_str(&entry.0).unwrap(),
-                end: Ipv4Addr::from_str(&entry.1).unwrap(),
-                rir: Rir::from_str(&entry.2).unwrap(),
-            });
+                info!("Loaded IANA recovered addresses!");
+
+                RecoveredProvider {
+                    value: recovered_entries,
+                }
+            }
+            None => panic!("Failed to load sources for IANA recovered addresses!"),
         }
-
-        info!("Loaded IANA recovered addresses!");
-
-        RecoveredProvider {
-            value: recovered_entries,
-        }
-    }
-
-    pub async fn register_and_load(
-        config: &Config,
-        registered: &mut Vec<Vec<String>>,
-    ) -> RecoveredProvider {
-        registered.push(
-            SECTIONS
-                .clone()
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>(),
-        );
-
-        RecoveredProvider::load(config).await
     }
 }
 

@@ -1,10 +1,10 @@
-use asn_prefixes::AsnPrefixEntry;
-use rir_allocations::RirAllocationEntry;
+use asn_prefixes::AsnPrefixesProvider;
+use rir_allocations::RirAllocationsProvider;
 
 pub mod asn_prefixes;
 pub mod rir_allocations;
 
 pub struct Providers {
-    pub asn: Vec<AsnPrefixEntry>,
-    pub rir: Vec<RirAllocationEntry>,
+    pub asn: AsnPrefixesProvider,
+    pub rir: RirAllocationsProvider,
 }

@@ -1,6 +1,6 @@
 [package]
 name = "diglett"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 [dependencies]
@@ -21,3 +21,4 @@ tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+uuid = { version = "1.11.0", features = ["v4"] }

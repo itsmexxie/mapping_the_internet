@@ -7,6 +7,7 @@ use std::{
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
@@ -76,7 +77,7 @@ async fn get_rir(
 
             if query.top {
                 // Use thyme allocations as top
-                for entry in state.providers.read().await.thyme.rir.iter() {
+                for entry in state.providers.read().await.thyme.rir.value.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
                             value: Some(entry.rir.id().to_string()),
@@ -118,7 +119,7 @@ async fn get_asn(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.thyme.asn.iter() {
+            for entry in state.providers.read().await.thyme.asn.value.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: Some(entry.asn),
@@ -154,8 +155,8 @@ async fn get_country(
     }
 }
 
-async fn index() -> &'static str {
-    "Diglett API, v1.0.0"
+async fn index() -> impl IntoResponse {
+    concat_string!("Diglett API, v", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(Clone)]
