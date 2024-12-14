@@ -23,4 +23,4 @@ The API_PORT in the docker run command must be the same one as the one you speci
 
 ## TODO
 - [ ] implement automatic downloads of asn prefixes file with cron
-- [ ] implement auth for queries
+- [x] implement auth for queries

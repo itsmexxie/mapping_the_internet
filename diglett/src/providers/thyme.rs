@@ -5,6 +5,6 @@ pub mod asn_prefixes;
 pub mod rir_allocations;
 
 pub struct Providers {
-    pub asn: AsnPrefixesProvider,
-    pub rir: RirAllocationsProvider,
+    pub asn_prefixes: AsnPrefixesProvider,
+    pub rir_allocations: RirAllocationsProvider,
 }

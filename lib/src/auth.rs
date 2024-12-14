@@ -1,3 +1,10 @@
+#[cfg(feature = "axum")]
+use axum::{
+    extract::{Request, State},
+    http::{HeaderMap, StatusCode},
+    middleware::Next,
+    response::IntoResponse,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncReadExt};
 
@@ -68,5 +75,47 @@ impl JWTKeys {
             private: None,
             public: public_key,
         }
+    }
+}
+
+pub trait GetJWTKeys {
+    fn get_jwt_keys(&self) -> impl AsRef<JWTKeys>;
+}
+
+#[cfg(feature = "axum")]
+pub async fn axum_middleware<S>(
+    headers: HeaderMap,
+    State(state): State<S>,
+    mut request: Request,
+    next: Next,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    S: GetJWTKeys,
+{
+    if !headers.contains_key("authorization") {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let header_token = headers
+        .get("authorization")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(" ")
+        .collect::<Vec<&str>>();
+    if header_token.len() < 2 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    match jsonwebtoken::decode::<JWTClaims>(
+        header_token[1],
+        &jsonwebtoken::DecodingKey::from_rsa_pem(&state.get_jwt_keys().as_ref().public).unwrap(),
+        &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS512),
+    ) {
+        Ok(token) => {
+            request.extensions_mut().insert(token);
+            Ok(next.run(request).await)
+        }
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
     }
 }

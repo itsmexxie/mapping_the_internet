@@ -1,6 +1,6 @@
 use axum::{routing::get, Router};
 use config::Config;
-use mtilib::auth::JWTKeys;
+use mtilib::auth::{GetJWTKeys, JWTKeys};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -24,6 +24,12 @@ pub struct AppState {
     pub worker_permits: Arc<Semaphore>,
     pub diglett: Arc<Diglett>,
     pub ping_client: Arc<surge_ping::Client>,
+}
+
+impl GetJWTKeys for AppState {
+    fn get_jwt_keys(&self) -> impl AsRef<JWTKeys> {
+        self.jwt_keys.clone()
+    }
 }
 
 pub async fn run(

@@ -20,7 +20,7 @@ impl CIDR {
 impl Display for CIDR {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
-            "prefix: {}, mask: {}",
+            "{}/{}",
             Ipv4Addr::from_bits(self.prefix),
             self.mask
         ))

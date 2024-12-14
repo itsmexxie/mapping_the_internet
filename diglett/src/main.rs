@@ -1,9 +1,11 @@
-use std::sync::Arc;
-
+use api::ApiOptions;
 use config::Config;
-use mtilib::pokedex::{config::PokedexConfig, Pokedex};
+use mtilib::{
+    auth::JWTKeys,
+    pokedex::{config::PokedexConfig, Pokedex},
+};
 use providers::Providers;
-use serde::Deserialize;
+use std::sync::Arc;
 use tokio::{
     signal::{self, unix::SignalKind},
     sync::{Mutex, RwLock},
@@ -13,16 +15,11 @@ use tracing::{error, info};
 
 pub mod api;
 pub mod providers;
+// pub mod scheduler;
 pub mod utils;
 
 #[macro_use(concat_string)]
 extern crate concat_string;
-
-pub fn get_config_value<T: for<'a> Deserialize<'a>>(config: &Config, id: &str) -> T {
-    config
-        .get::<T>(id)
-        .unwrap_or_else(|_| panic!("{} must be set!", id))
-}
 
 #[tokio::main]
 async fn main() {
@@ -30,10 +27,12 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Config
-    let config = Config::builder()
-        .add_source(config::File::with_name("config.toml"))
-        .build()
-        .unwrap();
+    let config = Arc::new(
+        Config::builder()
+            .add_source(config::File::with_name("config.toml"))
+            .build()
+            .unwrap(),
+    );
 
     // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
@@ -58,14 +57,13 @@ async fn main() {
     // Gracefule shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
-    let signal_task_pokedex = pokedex.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        signal_task_pokedex.lock().await.logout().await;
+                        pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -79,7 +77,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout().await;
+                pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks
@@ -89,16 +87,29 @@ async fn main() {
         }
     });
 
+    // Load JWT keys if api.auth is set to true
+    let mut jwt_keys = None;
+    if config.get_bool("api.auth").unwrap_or(true) {
+        jwt_keys = Some(Arc::new(
+            JWTKeys::load_public(
+                &config
+                    .get_string("api.jwt")
+                    .unwrap_or(String::from("jwt.key.pub")),
+            )
+            .await,
+        ))
+    }
+
     // Load providers
     let providers = Arc::new(RwLock::new(Providers::load(&config).await));
 
     // Scheduler task
-    // let scheduler_token = task_token.clone();
     // let scheduler_providers = providers.clone();
+    // let scheduler_token = task_token.clone();
     // task_tracker.spawn(async move {
     //     tokio::select! {
-    //         () = scheduler::run(scheduler, &mut scheduler_rx, scheduler_providers) => {
-    //             info!("Scheduler task exited on its own!");
+    //         _ = scheduler::run(scheduler_providers) => {
+    //             info!("Scheduler task exited on its own!")
     //         }
     //         () = scheduler_token.cancelled() => {
     //             info!("Scheduler task cancelled succesfully!");
@@ -107,14 +118,16 @@ async fn main() {
     // });
 
     // Axum API
-    let axum_token = task_token.clone();
-    let axum_providers = providers.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(config, axum_providers) => {
+            () = api::run(ApiOptions {
+                config,
+                providers,
+                jwt_keys
+            }) => {
                 info!("Axum API task exited on its own!");
             }
-            () = axum_token.cancelled() => {
+            () = task_token.cancelled() => {
                 info!("Axum API task cancelled succesfully!");
             }
         }

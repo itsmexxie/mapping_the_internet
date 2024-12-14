@@ -1,32 +1,27 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    str::FromStr,
-    sync::Arc,
-};
-
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    middleware,
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
 use config::Config;
-use mtilib::types::AllocationState;
-use serde::{Deserialize, Serialize};
+use mtilib::{
+    auth::{GetJWTKeys, JWTKeys},
+    types::{AllocationState, ValueResponse},
+};
+use serde::Deserialize;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-use crate::providers;
-
-#[derive(Serialize)]
-struct ValueResponse<T>
-where
-    T: Serialize,
-{
-    value: T,
-}
+use crate::providers::Providers;
 
 async fn get_allocation(
     Path(address): Path<String>,
@@ -36,7 +31,7 @@ async fn get_allocation(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.iana.reserved.value.iter() {
+            for entry in state.providers.read().await.iana.reserved.values.iter() {
                 if entry.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: AllocationState::Reserved.id(),
@@ -44,7 +39,7 @@ async fn get_allocation(
                 }
             }
 
-            for entry in state.providers.read().await.arin.stats.value.iter() {
+            for entry in state.providers.read().await.stats.values.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: entry.allocation_state.id(),
@@ -77,7 +72,15 @@ async fn get_rir(
 
             if query.top {
                 // Use thyme allocations as top
-                for entry in state.providers.read().await.thyme.rir.value.iter() {
+                for entry in state
+                    .providers
+                    .read()
+                    .await
+                    .thyme
+                    .rir_allocations
+                    .values
+                    .iter()
+                {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
                             value: Some(entry.rir.id().to_string()),
@@ -86,7 +89,7 @@ async fn get_rir(
                 }
             } else {
                 // First look up the IANA recovered addresses
-                for entry in state.providers.read().await.iana.recovered.value.iter() {
+                for entry in state.providers.read().await.iana.recovered.values.iter() {
                     if address_bits >= entry.start.to_bits() && address_bits <= entry.end.to_bits()
                     {
                         return Ok(Json(ValueResponse {
@@ -96,7 +99,7 @@ async fn get_rir(
                 }
 
                 // Then look up the ARIN stat files
-                for entry in state.providers.read().await.arin.stats.value.iter() {
+                for entry in state.providers.read().await.stats.values.iter() {
                     if entry.cidr.address_is_in(address_bits) {
                         return Ok(Json(ValueResponse {
                             value: Some(entry.rir.id().to_string()),
@@ -119,7 +122,15 @@ async fn get_asn(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.thyme.asn.value.iter() {
+            for entry in state
+                .providers
+                .read()
+                .await
+                .thyme
+                .asn_prefixes
+                .values
+                .iter()
+            {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: Some(entry.asn),
@@ -141,7 +152,7 @@ async fn get_country(
         Ok(address) => {
             let address_bits: u32 = address.into();
 
-            for entry in state.providers.read().await.arin.stats.value.iter() {
+            for entry in state.providers.read().await.stats.values.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
                         value: entry.country.to_owned(),
@@ -161,21 +172,48 @@ async fn index() -> impl IntoResponse {
 
 #[derive(Clone)]
 struct AppState {
-    providers: Arc<RwLock<providers::Providers>>,
+    providers: Arc<RwLock<Providers>>,
+    jwt_keys: Option<Arc<JWTKeys>>,
 }
 
-pub async fn run(config: Config, providers: Arc<RwLock<providers::Providers>>) {
-    let state = AppState { providers };
+impl GetJWTKeys for AppState {
+    fn get_jwt_keys(&self) -> impl AsRef<JWTKeys> {
+        self.jwt_keys.to_owned().unwrap()
+    }
+}
+
+pub struct ApiOptions {
+    pub config: Arc<Config>,
+    pub providers: Arc<RwLock<Providers>>,
+    pub jwt_keys: Option<Arc<JWTKeys>>,
+}
+
+pub async fn run(options: ApiOptions) {
+    let state = AppState {
+        providers: options.providers,
+        jwt_keys: options.jwt_keys,
+    };
+
+    let mut address_router = Router::new()
+        .route("/allocation", get(get_allocation))
+        .route("/rir", get(get_rir))
+        .route("/asn", get(get_asn))
+        .route("/country", get(get_country));
+
+    if state.jwt_keys.is_some() {
+        address_router = address_router.layer(middleware::from_fn_with_state(
+            state.clone(),
+            mtilib::auth::axum_middleware::<AppState>,
+        ))
+    }
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/:address/allocation", get(get_allocation))
-        .route("/:address/rir", get(get_rir))
-        .route("/:address/asn", get(get_asn))
-        .route("/:address/country", get(get_country))
+        .nest("/:address", address_router)
         .with_state(state)
         .layer(TraceLayer::new_for_http());
-    let app_port = config.get("api.port").unwrap();
+
+    let app_port = options.config.get("api.port").unwrap();
 
     let listener = tokio::net::TcpListener::bind(SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),

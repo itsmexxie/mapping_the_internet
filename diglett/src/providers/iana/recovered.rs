@@ -4,10 +4,11 @@ use config::Config;
 use mtilib::types::Rir;
 use tracing::info;
 
-use crate::providers;
+use crate::providers::{self, CheckAndDownloadSource, ProviderSource};
 
 pub struct RecoveredProvider {
-    pub value: Vec<RecoveredEntry>,
+    pub values: Vec<RecoveredEntry>,
+    pub sources: Vec<ProviderSource>,
 }
 
 impl RecoveredProvider {
@@ -17,10 +18,10 @@ impl RecoveredProvider {
         // Check if we need to redownload file
         match providers::load_provider_sources(config, "iana.recovered") {
             Some(sources) => {
-                providers::check_and_download(&sources).await;
+                sources.check_and_download().await;
 
                 let mut recovered_entries = Vec::new();
-                for source in sources {
+                for source in sources.iter() {
                     // Get the configured filepath and read the file into memory
                     let source_filepath = Path::new(&source.filepath);
 
@@ -42,7 +43,8 @@ impl RecoveredProvider {
                 info!("Loaded IANA recovered addresses!");
 
                 RecoveredProvider {
-                    value: recovered_entries,
+                    values: recovered_entries,
+                    sources,
                 }
             }
             None => panic!("Failed to load sources for IANA recovered addresses!"),

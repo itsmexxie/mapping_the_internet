@@ -3,10 +3,14 @@ use std::{path::Path, str::FromStr};
 use config::Config;
 use tracing::info;
 
-use crate::{providers, utils::CIDR};
+use crate::{
+    providers::{self, CheckAndDownloadSource, ProviderSource},
+    utils::CIDR,
+};
 
 pub struct ReservedProvider {
-    pub value: Vec<CIDR>,
+    pub values: Vec<CIDR>,
+    pub sources: Vec<ProviderSource>,
 }
 
 impl ReservedProvider {
@@ -16,10 +20,10 @@ impl ReservedProvider {
         // Check if we need to redownload file
         match providers::load_provider_sources(config, "iana.reserved") {
             Some(sources) => {
-                crate::providers::check_and_download(&sources).await;
+                sources.check_and_download().await;
 
                 let mut reserved_blocks = Vec::new();
-                for source in sources {
+                for source in sources.iter() {
                     let source_filepath = Path::new(&source.filepath);
 
                     let mut reader =
@@ -43,7 +47,8 @@ impl ReservedProvider {
                 reserved_blocks.sort();
 
                 ReservedProvider {
-                    value: reserved_blocks,
+                    values: reserved_blocks,
+                    sources,
                 }
             }
             None => panic!("Failed to load sources for IANA reserved addresses!"),

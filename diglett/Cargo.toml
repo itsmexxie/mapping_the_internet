@@ -9,7 +9,7 @@ clokwerk = "0.4.0"
 concat-string = "1.0.1"
 config = "0.14.1"
 csv = "1.3.1"
-mtilib = { path = "../lib", features = ["config"] }
+mtilib = { path = "../lib", features = ["axum", "config"] }
 priority-queue = "2.1.1"
 regex = "1.11.1"
 reqwest = "0.12.9"

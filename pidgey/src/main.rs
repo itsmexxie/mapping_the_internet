@@ -47,10 +47,10 @@ async fn main() {
     };
 
     // JWT keys
-    let jwt_keys: Arc<_> = Arc::new(
+    let jwt_keys = Arc::new(
         JWTKeys::load_public(
             &config
-                .get_string("api.jwt.public")
+                .get_string("api.jwt")
                 .unwrap_or(String::from("jwt.key.pub")),
         )
         .await,

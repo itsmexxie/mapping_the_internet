@@ -5,10 +5,14 @@ use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{providers, utils::CIDR};
+use crate::{
+    providers::{self, CheckAndDownloadSource, ProviderSource},
+    utils::CIDR,
+};
 
 pub struct AsnPrefixesProvider {
-    pub value: Vec<AsnPrefixEntry>,
+    pub values: Vec<AsnPrefixEntry>,
+    pub sources: Vec<ProviderSource>,
 }
 
 impl AsnPrefixesProvider {
@@ -18,10 +22,10 @@ impl AsnPrefixesProvider {
         // Check if we need to redownload file
         match providers::load_provider_sources(config, "thyme.asn_prefixes") {
             Some(sources) => {
-                providers::check_and_download(&sources).await;
+                sources.check_and_download().await;
 
                 let mut prefixes = Vec::new();
-                for source in sources {
+                for source in sources.iter() {
                     let asn_prefixes_filepath = Path::new(&source.filepath);
 
                     let mut file = File::open(asn_prefixes_filepath).await.unwrap();
@@ -41,7 +45,10 @@ impl AsnPrefixesProvider {
                 info!("Loaded ASN prefixes!");
                 prefixes.sort();
 
-                AsnPrefixesProvider { value: prefixes }
+                AsnPrefixesProvider {
+                    values: prefixes,
+                    sources,
+                }
             }
             None => panic!("Failed to load sources for Thyme's ASN prefixes"),
         }

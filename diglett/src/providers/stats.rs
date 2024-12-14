@@ -6,18 +6,53 @@ use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
 use crate::{
-    providers::{self, ProviderSource},
+    providers::{self, CheckAndDownloadSource},
     utils::CIDR,
 };
 
+use super::ProviderSource;
+
 const HEADER_SIZE: u32 = 4;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatsEntry {
+    pub cidr: CIDR,
+    pub allocation_state: AllocationState,
+    pub rir: Rir,
+    pub country: Option<String>,
+}
+
+impl PartialOrd for StatsEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for StatsEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.cidr.cmp(&self.cidr)
+    }
+}
+
+impl Display for StatsEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!(
+            "cidr: {}, allocation_state: {}, rir: {}, country: {}",
+            self.cidr,
+            self.allocation_state,
+            self.rir,
+            self.country.as_ref().unwrap_or(&String::from("-"))
+        ))
+    }
+}
+
 pub struct StatsProvider {
-    pub value: Vec<StatEntry>,
+    pub values: Vec<StatsEntry>,
+    pub sources: Vec<ProviderSource>,
 }
 
 impl StatsProvider {
-    pub async fn load_source(source: &ProviderSource) -> Vec<StatEntry> {
+    async fn load_source(source: &ProviderSource) -> Vec<StatsEntry> {
         let source_filepath = Path::new(&source.filepath);
 
         let mut file = File::open(source_filepath).await.unwrap();
@@ -55,7 +90,7 @@ impl StatsProvider {
                     _ => None,
                 };
 
-                stat_entries.push(StatEntry {
+                stat_entries.push(StatsEntry {
                     cidr: CIDR {
                         prefix: Ipv4Addr::from_str(parts[3]).unwrap().into(),
                         mask: (u32::MAX & !(parts[4].parse::<u32>().unwrap() - 1)).count_ones()
@@ -99,10 +134,10 @@ impl StatsProvider {
         // Check if we need to redownload file
         match providers::load_provider_sources(config, "arin.stats") {
             Some(sources) => {
-                providers::check_and_download(&sources).await;
+                sources.check_and_download().await;
 
                 let mut stat_entries = Vec::new();
-                for source in sources {
+                for source in sources.iter() {
                     stat_entries.append(&mut StatsProvider::load_source(&source).await);
                 }
 
@@ -110,42 +145,11 @@ impl StatsProvider {
                 stat_entries.sort();
 
                 StatsProvider {
-                    value: stat_entries,
+                    values: stat_entries,
+                    sources,
                 }
             }
             None => panic!("Failed to load sources for ARIN stats!"),
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StatEntry {
-    pub cidr: CIDR,
-    pub allocation_state: AllocationState,
-    pub rir: Rir,
-    pub country: Option<String>,
-}
-
-impl PartialOrd for StatEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for StatEntry {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cidr.cmp(&self.cidr)
-    }
-}
-
-impl Display for StatEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!(
-            "cidr: ({}), allocation_state: {:?}, rir: {:?}, country: {}",
-            self.cidr,
-            self.allocation_state,
-            self.rir,
-            self.country.as_ref().unwrap_or(&String::from("-"))
-        ))
     }
 }

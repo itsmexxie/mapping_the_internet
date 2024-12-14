@@ -6,10 +6,14 @@ use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::info;
 
-use crate::{providers, utils::CIDR};
+use crate::{
+    providers::{self, CheckAndDownloadSource, ProviderSource},
+    utils::CIDR,
+};
 
 pub struct RirAllocationsProvider {
-    pub value: Vec<RirAllocationEntry>,
+    pub values: Vec<RirAllocationEntry>,
+    pub sources: Vec<ProviderSource>,
 }
 
 impl RirAllocationsProvider {
@@ -19,10 +23,10 @@ impl RirAllocationsProvider {
         // Check if we need to redownload file
         match providers::load_provider_sources(config, "thyme.rir_allocations") {
             Some(sources) => {
-                providers::check_and_download(&sources).await;
+                sources.check_and_download().await;
 
                 let mut rir_allocations = Vec::new();
-                for source in sources {
+                for source in sources.iter() {
                     let rir_allocations_filepath = Path::new(&source.filepath);
 
                     let mut file: File = File::open(rir_allocations_filepath).await.unwrap();
@@ -43,7 +47,8 @@ impl RirAllocationsProvider {
                 rir_allocations.sort();
 
                 RirAllocationsProvider {
-                    value: rir_allocations,
+                    values: rir_allocations,
+                    sources,
                 }
             }
             None => panic!("Failed to load sources for Thyme's RIR allocations!"),
