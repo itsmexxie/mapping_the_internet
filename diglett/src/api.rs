@@ -166,6 +166,10 @@ async fn get_country(
     }
 }
 
+async fn health() -> impl IntoResponse {
+    StatusCode::OK
+}
+
 async fn index() -> impl IntoResponse {
     concat_string!("Diglett API, v", env!("CARGO_PKG_VERSION"))
 }
@@ -209,6 +213,7 @@ pub async fn run(options: ApiOptions) {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/health", get(health))
         .nest("/:address", address_router)
         .with_state(state)
         .layer(TraceLayer::new_for_http());
