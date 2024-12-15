@@ -1,0 +1,18 @@
+# Example config for the daemon
+[api]
+# port =					# Specifies the port for the Axum API to listen on
+
+[api.jwt]
+# private = "jwt.key"		# Specifies the location of the private JWT key used for auth. Defaults to `jwt.key`.
+# public = "jwt.key.pub"	# Specifies the location of the public JWT key used for auth. Defaults to `jwt.key.pub`.
+# expiry = 2592000			# Expiration time of the generated JWT, in seconds. Defaults to 30 days.
+
+[database]
+# host =
+# username =
+# password =
+# database =
+
+[unit]
+# address =					# Specifies the address to announce to the service units database.
+# announce_port = false		# Specifies whether to announce the api.port to the service units database. Defaults to false.
