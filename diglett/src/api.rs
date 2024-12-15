@@ -166,6 +166,10 @@ async fn get_country(
     }
 }
 
+async fn unit(State(state): State<AppState>) -> impl IntoResponse {
+    StatusCode::NOT_IMPLEMENTED
+}
+
 async fn health() -> impl IntoResponse {
     StatusCode::OK
 }
@@ -176,8 +180,9 @@ async fn index() -> impl IntoResponse {
 
 #[derive(Clone)]
 struct AppState {
-    providers: Arc<RwLock<Providers>>,
+    jwt: Arc<String>,
     jwt_keys: Option<Arc<JWTKeys>>,
+    providers: Arc<RwLock<Providers>>,
 }
 
 impl GetJWTKeys for AppState {
@@ -188,14 +193,16 @@ impl GetJWTKeys for AppState {
 
 pub struct ApiOptions {
     pub config: Arc<Config>,
-    pub providers: Arc<RwLock<Providers>>,
+    pub jwt: Arc<String>,
     pub jwt_keys: Option<Arc<JWTKeys>>,
+    pub providers: Arc<RwLock<Providers>>,
 }
 
 pub async fn run(options: ApiOptions) {
     let state = AppState {
-        providers: options.providers,
+        jwt: options.jwt,
         jwt_keys: options.jwt_keys,
+        providers: options.providers,
     };
 
     let mut address_router = Router::new()
@@ -213,7 +220,8 @@ pub async fn run(options: ApiOptions) {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/health", get(health))
+        .route("/_unit", get(unit))
+        .route("/_health", get(health))
         .nest("/:address", address_router)
         .with_state(state)
         .layer(TraceLayer::new_for_http());

@@ -1,10 +1,11 @@
 use config::Config;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use mtilib::auth::JWTKeys;
-use std::sync::Arc;
-use tokio::signal;
+use std::{str::FromStr, sync::Arc};
+use tokio::signal::{self, unix::SignalKind};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
+use uuid::Uuid;
 
 #[macro_use(concat_string)]
 extern crate concat_string;
@@ -17,6 +18,15 @@ pub mod schema;
 use models::{NewServiceUnit, Service, ServiceUnit};
 use schema::{ServiceUnits, Services};
 
+/*
+ * 1. Tracing
+ * 2. Config
+ * 3. Load JWT keys
+ * 3. Register unit with database
+ * 4. Tokio setup
+ * 5. Graceful shutdown task
+ * 6. Axum API task
+ */
 #[tokio::main]
 async fn main() {
     // Tracing
@@ -75,43 +85,62 @@ async fn main() {
         .returning(ServiceUnit::as_returning())
         .get_result(&mut pg_conn)
         .expect("Failed to register unit with database!");
+    let pokedex_unit_uuid = Arc::new(Uuid::from_str(&pokedex_unit.id).unwrap());
     info!("Successfully registered unit with database!");
 
     // Tokio setup
     let task_tracker = TaskTracker::new();
     let task_token = CancellationToken::new();
 
-    // Axum API
-    let axum_token = task_token.clone();
-    let axum_config = config.clone();
-    let axum_jwt_keys = jwt_keys.clone();
-    task_tracker.spawn(async move {
-        tokio::select! {
-            () = api::run(axum_config, axum_jwt_keys) => {
-                info!("Axum API task exited on its own!");
-            }
-            () = axum_token.cancelled() => {
-                info!("Axum API task cancelled successfully!");
-            }
-        }
-    });
-
+    // Gracefule shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
+    let signal_task_token = task_token.clone();
     tokio::spawn(async move {
-        match signal::ctrl_c().await {
-            Ok(_) => {
+        let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
+        tokio::select! {
+            result = signal::ctrl_c() => {
+                match result {
+                    Ok(_) => {
+                        // Deregister pokedex with database
+                        diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(pokedex_unit.id)))
+                            .execute(&mut pg_conn)
+                            .unwrap();
+                        info!("Successfully deregistered unit with database!");
+
+                        // Cancel all tasks
+                        signal_task_tracker.close();
+                        signal_task_token.cancel();
+                    }
+                    Err(err) => {
+                        error!("Unable to listen for shutdown signal: {}", err);
+                    }
+                }
+            }
+            _ = sigterm.recv() => {
                 // Deregister pokedex with database
                 diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(pokedex_unit.id)))
                     .execute(&mut pg_conn)
                     .unwrap();
                 info!("Successfully deregistered unit with database!");
 
+
                 // Cancel all tasks
                 signal_task_tracker.close();
-                task_token.cancel();
+                signal_task_token.cancel();
             }
-            Err(err) => {
-                error!("Unable to listen for shutdown signal: {}", err);
+        }
+    });
+
+    // Axum API
+    let axum_config = config.clone();
+    let axum_jwt_keys = jwt_keys.clone();
+    task_tracker.spawn(async move {
+        tokio::select! {
+            () = api::run(axum_config, axum_jwt_keys, pokedex_unit_uuid) => {
+                info!("Axum API task exited on its own!");
+            }
+            () = task_token.cancelled() => {
+                info!("Axum API task cancelled successfully!");
             }
         }
     });

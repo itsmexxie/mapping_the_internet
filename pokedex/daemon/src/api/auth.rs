@@ -1,53 +1,18 @@
 use axum::{
-    extract::{Query, Request, State},
-    http::{HeaderMap, StatusCode},
-    middleware::Next,
-    response::IntoResponse,
-    Json,
+    extract::{Query, State},
+    http::StatusCode,
+    Extension, Json,
 };
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
+use jsonwebtoken::{Algorithm, EncodingKey, TokenData};
 use mtilib::auth::JWTClaims;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 use super::AppState;
 use crate::models::{NewServiceUnit, Service, ServiceUnit};
 use crate::schema::{ServiceUnits, Services};
-
-pub async fn auth_middleware(
-    headers: HeaderMap,
-    State(state): State<AppState>,
-    mut request: Request,
-    next: Next,
-) -> Result<impl IntoResponse, StatusCode> {
-    if !headers.contains_key("authorization") {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    let header_token = headers
-        .get("authorization")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(" ")
-        .collect::<Vec<&str>>();
-    if header_token.len() < 2 {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    match jsonwebtoken::decode::<JWTClaims>(
-        header_token[1],
-        &DecodingKey::from_rsa_pem(&state.jwt_keys.public).unwrap(),
-        &Validation::new(Algorithm::RS512),
-    ) {
-        Ok(token) => {
-            request.extensions_mut().insert(token);
-            Ok(next.run(request).await)
-        }
-        Err(_) => Err(StatusCode::UNAUTHORIZED),
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct LoginBody {
@@ -60,13 +25,14 @@ pub struct LoginBody {
 #[derive(Serialize)]
 pub struct LoginResponse {
     pub token: String,
+    pub uuid: Uuid,
 }
 
 pub async fn login_index(
     Query(login_body): Query<LoginBody>,
-    State(app_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&app_state.config);
+    let pg_conn = &mut crate::db::create_conn(&state.config);
 
     let service_query = Services::table
         .select(Service::as_select())
@@ -82,28 +48,32 @@ pub async fn login_index(
                 .load(pg_conn)
                 .unwrap();
 
-            if service_units_query.len() > 0 {
+            if !service_units_query.is_empty() {
                 return Err(StatusCode::FORBIDDEN);
             }
         }
 
-        let unit_uuid = uuid::Uuid::new_v4();
+        let new_unit_uuid = uuid::Uuid::new_v4();
         let system_time = SystemTime::now();
 
         let token_claims = JWTClaims {
-            id: unit_uuid.to_string(),
+            id: new_unit_uuid.to_string(),
             srv: login_body.username.clone(),
-            exp: system_time.duration_since(UNIX_EPOCH).unwrap().as_secs() + 30 * 24 * 60 * 60,
+            exp: system_time.duration_since(UNIX_EPOCH).unwrap().as_secs()
+                + state
+                    .config
+                    .get_int("api.jwt.expiration")
+                    .unwrap_or(2592000) as u64,
         };
         let token = jsonwebtoken::encode(
             &jsonwebtoken::Header::new(Algorithm::RS512),
             &token_claims,
-            &EncodingKey::from_rsa_pem(app_state.jwt_keys.private.as_ref().unwrap()).unwrap(),
+            &EncodingKey::from_rsa_pem(state.jwt_keys.private.as_ref().unwrap()).unwrap(),
         )
         .unwrap();
 
         let new_service_unit = NewServiceUnit {
-            id: &unit_uuid.to_string(),
+            id: &new_unit_uuid.to_string(),
             service_id: service_query.id, // service id as queried from the database
             address: login_body.address,
             port: login_body.port,
@@ -116,44 +86,21 @@ pub async fn login_index(
 
         Ok(Json(LoginResponse {
             token: token.to_string(),
+            uuid: new_unit_uuid,
         }))
     } else {
         Err(StatusCode::UNAUTHORIZED)
     }
 }
 
-pub async fn logout_index(headers: HeaderMap, State(app_state): State<AppState>) -> StatusCode {
-    if !headers.contains_key("authorization") {
-        return StatusCode::BAD_REQUEST;
-    }
+pub async fn logout_index(
+    Extension(jwt): Extension<TokenData<JWTClaims>>,
+    State(state): State<AppState>,
+) -> StatusCode {
+    let pg_conn = &mut crate::db::create_conn(&state.config);
+    diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(jwt.claims.id)))
+        .execute(pg_conn)
+        .unwrap();
 
-    let header_token = headers
-        .get("authorization")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(" ")
-        .collect::<Vec<&str>>();
-    if header_token.len() < 2 {
-        return StatusCode::BAD_REQUEST;
-    }
-
-    match jsonwebtoken::decode::<JWTClaims>(
-        header_token[1],
-        &DecodingKey::from_rsa_pem(&app_state.jwt_keys.public).unwrap(),
-        &Validation::new(Algorithm::RS512),
-    ) {
-        Ok(token) => {
-            let pg_conn = &mut crate::db::create_conn(&app_state.config);
-            diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(token.claims.id)))
-                .execute(pg_conn)
-                .unwrap();
-
-            StatusCode::OK
-        }
-        Err(err) => {
-            println!("{:?}", err);
-            StatusCode::UNAUTHORIZED
-        }
-    }
+    StatusCode::OK
 }

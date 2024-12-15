@@ -21,9 +21,19 @@ pub mod utils;
 #[macro_use(concat_string)]
 extern crate concat_string;
 
+/*
+ * 1. Logging
+ * 2. Config
+ * 3. Load JWT keys
+ * 3. Login to Pokedex
+ * 4. Tokio setup
+ * 5. Graceful shutdown task
+ * 6. Load providers
+ * 7. Axum API task
+ */
 #[tokio::main]
 async fn main() {
-    // Logging
+    // Tracing
     tracing_subscriber::fmt::init();
 
     // Config
@@ -34,12 +44,26 @@ async fn main() {
             .unwrap(),
     );
 
+	// Load JWT keys if api.auth is set to true
+	let mut jwt_keys = None;
+	if config.get_bool("api.auth").unwrap_or(true) {
+		jwt_keys = Some(Arc::new(
+			JWTKeys::load_public(
+				&config
+					.get_string("api.jwt")
+					.unwrap_or(String::from("jwt.key.pub")),
+			)
+			.await,
+		))
+	}
+]
+
     // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
         &config,
     ))));
 
-    let _ = match pokedex.lock().await.login().await {
+    let jwt = match pokedex.lock().await.login().await {
         Ok(token) => {
             info!("Successfully logged into Pokedex!");
             Arc::new(token)
@@ -87,19 +111,6 @@ async fn main() {
         }
     });
 
-    // Load JWT keys if api.auth is set to true
-    let mut jwt_keys = None;
-    if config.get_bool("api.auth").unwrap_or(true) {
-        jwt_keys = Some(Arc::new(
-            JWTKeys::load_public(
-                &config
-                    .get_string("api.jwt")
-                    .unwrap_or(String::from("jwt.key.pub")),
-            )
-            .await,
-        ))
-    }
-
     // Load providers
     let providers = Arc::new(RwLock::new(Providers::load(&config).await));
 
@@ -122,8 +133,9 @@ async fn main() {
         tokio::select! {
             () = api::run(ApiOptions {
                 config,
+                jwt,
+                jwt_keys,
                 providers,
-                jwt_keys
             }) => {
                 info!("Axum API task exited on its own!");
             }

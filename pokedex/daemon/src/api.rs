@@ -1,14 +1,16 @@
 use axum::extract::{Path, State};
+use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{http::StatusCode, routing::post, Json, Router};
 use config::Config;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
-use mtilib::auth::JWTKeys;
+use mtilib::auth::{GetJWTKeys, JWTKeys};
 use serde::Serialize;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::models::{Service, ServiceUnit};
 use crate::schema::{ServiceUnits, Services};
@@ -52,9 +54,9 @@ async fn get_services(
 
 async fn get_service(
     Path(service_id): Path<i32>,
-    State(api_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<ApiService>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&api_state.config);
+    let pg_conn = &mut crate::db::create_conn(&state.config);
 
     let query_result = Services::dsl::Services
         .filter(Services::id.eq(service_id))
@@ -70,9 +72,9 @@ async fn get_service(
 
 async fn get_service_units(
     Path(service_id): Path<i32>,
-    State(api_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<ApiServiceUnit>>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&api_state.config);
+    let pg_conn = &mut crate::db::create_conn(&state.config);
 
     let query_results: Vec<ServiceUnit> = ServiceUnits::dsl::ServiceUnits
         .filter(ServiceUnits::service_id.eq(service_id))
@@ -93,34 +95,73 @@ async fn get_service_units(
     Ok(Json(api_results))
 }
 
+#[derive(Serialize)]
+struct UnitResponse {
+    uuid: Uuid,
+}
+
+async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
+    Json(UnitResponse { uuid: *state.uuid })
+}
+
+async fn health() -> impl IntoResponse {
+    StatusCode::OK
+}
+
+async fn index() -> impl IntoResponse {
+    concat_string!("Pokedex API, v", env!("CARGO_PKG_VERSION"))
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
     pub jwt_keys: Arc<JWTKeys>,
+    pub uuid: Arc<Uuid>,
 }
 
-pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>) {
+impl GetJWTKeys for AppState {
+    fn get_jwt_keys(&self) -> impl AsRef<JWTKeys> {
+        self.jwt_keys.to_owned()
+    }
+}
+
+pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, uuid: Arc<Uuid>) {
     let state = AppState {
         config: config.clone(),
         jwt_keys,
+        uuid,
     };
 
     let app = Router::new()
-        .route("/services", get(get_services))
-        .route("/services/:service_id", get(get_service))
-        .route("/services/:service_id/units", get(get_service_units))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            auth::auth_middleware,
-        ))
+        .nest(
+            "/services",
+            Router::new()
+                .route("/", get(get_services))
+                .route("/:service_id", get(get_service))
+                .route("/:service_id/units", get(get_service_units))
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    mtilib::auth::axum_middleware::<AppState>,
+                )),
+        )
         .nest(
             "/auth",
             Router::new()
                 .route("/login", post(auth::login_index))
-                .route("/logout", post(auth::logout_index)),
+                .route(
+                    "/logout",
+                    post(auth::logout_index).layer(axum::middleware::from_fn_with_state(
+                        state.clone(),
+                        mtilib::auth::axum_middleware::<AppState>,
+                    )),
+                ),
         )
+        .route("/_unit", get(unit))
+        .route("/_health", get(health))
+        .route("/", get(index))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
+
     let app_port = config.get("api.port").expect("api.port must be set!");
 
     let listener = tokio::net::TcpListener::bind(SocketAddr::new(
