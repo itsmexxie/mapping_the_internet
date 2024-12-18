@@ -11,7 +11,7 @@ use mtilib::{
     auth::{GetJWTKeys, JWTKeys},
     types::{AllocationState, ValueResponse},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
@@ -20,6 +20,7 @@ use std::{
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::providers::Providers;
 
@@ -166,8 +167,15 @@ async fn get_country(
     }
 }
 
-async fn unit(State(state): State<AppState>) -> impl IntoResponse {
-    StatusCode::NOT_IMPLEMENTED
+#[derive(Serialize)]
+struct UnitResponse {
+    uuid: Uuid,
+}
+
+async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
+    Json(UnitResponse {
+        uuid: *state.unit_uuid,
+    })
 }
 
 async fn health() -> impl IntoResponse {
@@ -180,7 +188,7 @@ async fn index() -> impl IntoResponse {
 
 #[derive(Clone)]
 struct AppState {
-    jwt: Arc<String>,
+    unit_uuid: Arc<Uuid>,
     jwt_keys: Option<Arc<JWTKeys>>,
     providers: Arc<RwLock<Providers>>,
 }
@@ -193,14 +201,14 @@ impl GetJWTKeys for AppState {
 
 pub struct ApiOptions {
     pub config: Arc<Config>,
-    pub jwt: Arc<String>,
+    pub unit_uuid: Arc<Uuid>,
     pub jwt_keys: Option<Arc<JWTKeys>>,
     pub providers: Arc<RwLock<Providers>>,
 }
 
 pub async fn run(options: ApiOptions) {
     let state = AppState {
-        jwt: options.jwt,
+        unit_uuid: options.unit_uuid,
         jwt_keys: options.jwt_keys,
         providers: options.providers,
     };

@@ -4,11 +4,7 @@ use serde::Deserialize;
 pub mod config;
 
 use config::PokedexConfig;
-
-#[derive(Deserialize)]
-struct PokedexLoginResponse {
-    token: String,
-}
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct Service {
@@ -30,6 +26,12 @@ pub struct Pokedex {
     token: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub uuid: Uuid,
+}
+
 impl Pokedex {
     pub fn new(config: PokedexConfig) -> Self {
         Pokedex {
@@ -39,7 +41,7 @@ impl Pokedex {
         }
     }
 
-    pub async fn login(&mut self) -> Result<String, &'static str> {
+    pub async fn login(&mut self) -> Result<LoginResponse, &'static str> {
         let mut pokedex_url = self.config.address.clone();
         pokedex_url.set_path("auth/login");
 
@@ -60,9 +62,9 @@ impl Pokedex {
         match self.client.post(pokedex_url).send().await {
             Ok(res) => match res.status() {
                 StatusCode::OK => {
-                    let json = res.json::<PokedexLoginResponse>().await.unwrap();
+                    let json = res.json::<LoginResponse>().await.unwrap();
                     self.token = Some(json.token.clone());
-                    Ok(json.token)
+                    Ok(json)
                 }
                 StatusCode::BAD_REQUEST => Err("Invalid IP address and/or port in Pokedex login!"),
                 StatusCode::UNAUTHORIZED => {

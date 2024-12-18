@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: "Diglett API"
   description: "A service that provides a nice HTTP abstraction over services that provide address information via text files."
-  version: "0.1.0"
+  version: "1.2.0"
 
 paths:
   /{address}/allocation:

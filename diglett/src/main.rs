@@ -44,29 +44,28 @@ async fn main() {
             .unwrap(),
     );
 
-	// Load JWT keys if api.auth is set to true
-	let mut jwt_keys = None;
-	if config.get_bool("api.auth").unwrap_or(true) {
-		jwt_keys = Some(Arc::new(
-			JWTKeys::load_public(
-				&config
-					.get_string("api.jwt")
-					.unwrap_or(String::from("jwt.key.pub")),
-			)
-			.await,
-		))
-	}
-]
+    // Load JWT keys if api.auth is set to true
+    let mut jwt_keys = None;
+    if config.get_bool("api.auth").unwrap_or(true) {
+        jwt_keys = Some(Arc::new(
+            JWTKeys::load_public(
+                &config
+                    .get_string("api.jwt")
+                    .unwrap_or(String::from("jwt.key.pub")),
+            )
+            .await,
+        ))
+    }
 
     // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
         &config,
     ))));
 
-    let jwt = match pokedex.lock().await.login().await {
-        Ok(token) => {
+    let unit_uuid = match pokedex.lock().await.login().await {
+        Ok(login_res) => {
             info!("Successfully logged into Pokedex!");
-            Arc::new(token)
+            Arc::new(login_res.uuid)
         }
         Err(error) => {
             error!(error);
@@ -133,7 +132,7 @@ async fn main() {
         tokio::select! {
             () = api::run(ApiOptions {
                 config,
-                jwt,
+                unit_uuid,
                 jwt_keys,
                 providers,
             }) => {
