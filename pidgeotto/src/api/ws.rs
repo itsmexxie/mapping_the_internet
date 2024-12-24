@@ -6,11 +6,11 @@ use axum::{
         ws::{Message, WebSocket},
         State, WebSocketUpgrade,
     },
-    http::{HeaderMap, StatusCode},
     response::Response,
+    Extension,
 };
 use futures::{SinkExt, StreamExt};
-use jsonwebtoken::{DecodingKey, Validation};
+use jsonwebtoken::TokenData;
 use mtilib::{auth::JWTClaims, pidgey::PidgeyCommandResponse};
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -21,32 +21,10 @@ use super::AppState;
 
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    headers: HeaderMap,
+    Extension(token): Extension<TokenData<JWTClaims>>,
     State(state): State<AppState>,
-) -> Result<Response<Body>, StatusCode> {
-    if !headers.contains_key("authorization") {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    let header_token = headers
-        .get("authorization")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(" ")
-        .collect::<Vec<&str>>();
-    if header_token.len() < 2 {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    match jsonwebtoken::decode::<JWTClaims>(
-        header_token[1],
-        &DecodingKey::from_rsa_pem(&state.jwt_keys.public).unwrap(),
-        &Validation::new(jsonwebtoken::Algorithm::RS512),
-    ) {
-        Ok(token) => Ok(ws.on_upgrade(move |socket| socket_handler(socket, token.claims, state))),
-        Err(_) => Err(StatusCode::UNAUTHORIZED),
-    }
+) -> Response<Body> {
+    ws.on_upgrade(move |socket| socket_handler(socket, token.claims, state))
 }
 
 pub async fn socket_handler(socket: WebSocket, jwt: JWTClaims, state: AppState) {

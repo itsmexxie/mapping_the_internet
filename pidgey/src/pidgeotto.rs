@@ -81,7 +81,7 @@ pub async fn run(
         tokio::sync::mpsc::channel::<PidgeyCommandResponse>(max_workers);
 
     // Websocket write task
-    // Can't clone the resulting ws_write from tungstenite, so only can task handles the writing to the websocket
+    // Can't clone the resulting ws_write from tungstenite, so only this task writes to the websocket
     // while other tasks use tokio::sync::mpsc channels to communicate with this task
     tokio::spawn(async move {
         while let Some(response) = response_rx.recv().await {

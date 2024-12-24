@@ -22,7 +22,7 @@ pub mod utils;
 extern crate concat_string;
 
 /*
- * 1. Logging
+ * 1. Tracing
  * 2. Config
  * 3. Load JWT keys
  * 3. Login to Pokedex

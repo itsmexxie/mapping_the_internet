@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use api::ApiOptions;
 use config::Config;
 use mtilib::{
     auth::JWTKeys,
@@ -23,6 +24,16 @@ pub mod pidgey;
 pub mod scanner;
 pub mod schema;
 
+/*
+ * 1. Tracing
+ * 2. Config
+ * 3. Load JWT keys
+ * 3. Login to Pokedex
+ * 4. Tokio setup
+ * 5. Graceful shutdown task
+ * 6. Scanner task
+ * 7. Axum API task
+ */
 #[tokio::main]
 async fn main() {
     // Tracing
@@ -51,10 +62,10 @@ async fn main() {
         &config,
     ))));
 
-    let jwt = match pokedex.lock().await.login().await {
-        Ok(token) => {
+    let unit_uuid = match pokedex.lock().await.login().await {
+        Ok(res) => {
             info!("Successfully logged into Pokedex!");
-            Arc::new(token)
+            Arc::new(res.uuid)
         }
         Err(error) => {
             error!(error);
@@ -77,7 +88,7 @@ async fn main() {
                 match result {
                     Ok(_) => {
                         // Logout of Pokedex
-                        signal_task_pokedex.lock().await.logout(&jwt).await;
+                        signal_task_pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -91,7 +102,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout(&jwt).await;
+                signal_task_pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks
@@ -125,7 +136,12 @@ async fn main() {
     let axum_jwt_keys = jwt_keys.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(axum_config, axum_jwt_keys, pidgey) => {
+            () = api::run(ApiOptions {
+                config: axum_config,
+                unit_uuid: unit_uuid,
+                jwt_keys: axum_jwt_keys,
+                pidgey: pidgey
+            }) => {
                 info!("Axum API task exited on its own!");
             },
             () = axum_task_token.cancelled() => {

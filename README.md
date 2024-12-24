@@ -7,26 +7,31 @@ We want to know these things about a specific address:
 - Which RIR this address originally falls under (/8 block segments)
 - Which RIR does this address belong to
 - Which ASN does this address belong to
-- What ports are open on this server
-- What services are available on the server
 
 Here is the address record structure from the database
 ```yml
 - id: string
 - allocation_state_id: bool
-- routed: bool
-- online: bool
 - top_rir_id: int
 - rir_id: int
 - asn_id: int
 - country_id: int
+- routed: bool
+- online: bool
 ```
 
-### States
-An IPv4 address can be in one of the following states:
+### Allocation states
+An IPv4 address can be in one of the following allocation states:
+- `unknown` - self explanatory
 - `reserved` - the address is reserved
-- `unassigned` - the address wasn't yet assigned to a register
-- `assigned unrouted` - the address was assigned, but no routers know how to get there
-- `assigned routed offline` - the address was assigned and is routed (and the route is publicly known via protocols like BGP)
-- `assigned routed online` - the address was assigned, is routed and is connected to a live computer
+- `unassigned` - the address wasn't yet assigned to a register or the register has not yet given it away
+- `assigned` - the address was assigned
 
+## TODO
+- [ ] (Diglett) implement automatic downloads of asn prefixes file with cron
+- [ ] (Pidgey) Pidgeotto service discovery via Pokedex
+- [ ] (Pidgeotto) Implement job queue and rework the scanning to progresivelly scan and add to queue
+- [ ] (Pidgeotto) Implement stale address records via updated_at timestamps
+- [ ] (Bulbasaur) Create the damn thing, maybe?
+- [ ] (Pidgey) Return the 500 error when Diglett responds with a 500 error
+- [ ] (Pidgeotto) Implement a timeout when waiting for a job response from Pidgey

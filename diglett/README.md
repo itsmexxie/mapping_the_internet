@@ -20,7 +20,3 @@ docker run --rm -v ./jwt.key.pub:/jwt.key.pub -v ./config.toml:/config.toml -p 7
 ```
 
 The API_PORT in the docker run command must be the same one as the one you specified in the config.
-
-## TODO
-- [ ] implement automatic downloads of asn prefixes file with cron
-- [x] implement auth for queries
