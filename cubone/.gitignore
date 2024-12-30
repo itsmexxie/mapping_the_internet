@@ -2,4 +2,4 @@
 .env
 
 # Config
-config.toml
+/config.toml
