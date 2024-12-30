@@ -25,10 +25,9 @@ impl Diglett {
 
             match url::Url::parse(&diglett_address) {
                 Ok(mut diglett_url) => {
-                    match config.get_int("diglett.port") {
-                        Ok(port) => diglett_url.set_port(Some(port as u16)).unwrap(),
-                        Err(_) => {}
-                    };
+                    if let Ok(port) = config.get_int("diglett.port") {
+                        diglett_url.set_port(Some(port as u16)).unwrap()
+                    }
 
                     match diglett_client.get(diglett_url.clone()).send().await {
                         Ok(_) => {
@@ -74,10 +73,9 @@ impl Diglett {
             if let Some(diglett_address) = &units[i].address {
                 match url::Url::parse(diglett_address) {
                     Ok(mut diglett_url) => {
-                        match units[i].port {
-                            Some(port) => diglett_url.set_port(Some(port as u16)).unwrap(),
-                            None => {}
-                        };
+                        if let Some(port) = units[i].port {
+                            diglett_url.set_port(Some(port as u16)).unwrap()
+                        }
 
                         match diglett_client.get(diglett_url.clone()).send().await {
                             Ok(_) => {

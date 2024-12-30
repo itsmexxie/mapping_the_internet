@@ -37,9 +37,8 @@ pub async fn run(
     )
     .expect("Failed to parse configured pidgeotto address!");
 
-    match config.get_int("pidgeotto.port") {
-        Ok(port) => pidgeotto_url.set_port(Some(port as u16)).unwrap(),
-        Err(_) => {}
+    if let Ok(port) = config.get_int("pidgeotto.port") {
+        pidgeotto_url.set_port(Some(port as u16)).unwrap()
     }
 
     pidgeotto_url.set_path("/ws");
@@ -177,11 +176,8 @@ pub async fn run(
                                     let mut pinger = cloned_ping_client
                                         .pinger(IpAddr::V4(address), PingIdentifier(random()))
                                         .await;
-                                    let online = match pinger.ping(PingSequence(0), &payload).await
-                                    {
-                                        Ok(_) => true,
-                                        Err(_) => false,
-                                    };
+                                    let online =
+                                        pinger.ping(PingSequence(0), &payload).await.is_ok();
 
                                     // let gust = Arc::new(Gust::new(address).unwrap());
 

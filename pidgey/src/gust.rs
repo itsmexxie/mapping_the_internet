@@ -61,9 +61,8 @@ impl Gust {
         for port in range {
             let cloned_ports = ports.clone();
             let cloned_gust = self.clone();
-            let cloned_timeout = timeout.clone();
             port_tasks.push(tokio::spawn(async move {
-                let result = cloned_gust.attack(port, cloned_timeout).await;
+                let result = cloned_gust.attack(port, timeout).await;
 
                 if result {
                     cloned_ports.lock().await.insert(port, result);
@@ -83,10 +82,9 @@ impl Gust {
 
     pub async fn attack(&self, port: u16, timeout: u32) -> bool {
         match tokio::time::timeout(Duration::from_secs(timeout.into()), async move {
-            match TcpStream::connect(SocketAddr::new(IpAddr::V4(self.0), port)).await {
-                Ok(_) => true,
-                Err(_) => false,
-            }
+            TcpStream::connect(SocketAddr::new(IpAddr::V4(self.0), port))
+                .await
+                .is_ok()
         })
         .await
         {
