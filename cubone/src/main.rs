@@ -1,70 +1,48 @@
 use std::sync::Arc;
 
-use config::Config;
-use diglett::Diglett;
-use mtilib::{
-    auth::JWTKeys,
-    pokedex::{config::PokedexConfig, Pokedex},
-};
+use mtilib::pokedex::{config::PokedexConfig, Pokedex};
+use settings::Settings;
 use tokio::{
+    fs::File,
+    io,
     signal::{self, unix::SignalKind},
-    sync::{Mutex, Semaphore},
+    sync::Mutex,
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
-#[macro_use(concat_string)]
-extern crate concat_string;
-
 pub mod api;
-pub mod diglett;
-pub mod gust;
-pub mod pidgeotto;
-
-pub const MAX_WORKERS: usize = 64;
+pub mod models;
+pub mod schema;
+pub mod settings;
 
 #[tokio::main]
 async fn main() {
+    // Sprite
+    let sprite_file = File::open("sprite.txt")
+        .await
+        .expect("Failed to read sprite file!");
+    let mut reader = io::BufReader::new(sprite_file);
+    io::copy(&mut reader, &mut io::stdout())
+        .await
+        .expect("Failed to copy sprite to stdout!");
+
     // Tracing
     tracing_subscriber::fmt::init();
 
-    // Something for WSS
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
-
-    // Config
-    let config = Arc::new(
-        Config::builder()
-            .add_source(config::File::with_name("config.toml"))
-            .build()
-            .unwrap(),
-    );
-
-    let max_workers = match config.get_int("settings.max_workers") {
-        Ok(max) => max as usize,
-        Err(_) => MAX_WORKERS,
-    };
-
-    // JWT keys
-    let jwt_keys = Arc::new(
-        JWTKeys::load_public(
-            &config
-                .get_string("api.jwt")
-                .unwrap_or(String::from("jwt.key.pub")),
-        )
-        .await,
-    );
+    // Settings
+    let (config, settings) = Settings::load();
+    let settings = Arc::new(settings);
 
     // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
         &config,
     ))));
 
-    let (jwt, unit_uuid) = match pokedex.lock().await.login().await {
+    let unit_uuid = match pokedex.lock().await.login().await {
         Ok(res) => {
             info!("Successfully logged into Pokedex!");
-            (Arc::new(res.token), Arc::new(res.uuid))
+            Arc::new(res.uuid)
         }
         Err(error) => {
             error!(error);
@@ -75,8 +53,6 @@ async fn main() {
     // Tokio setup
     let task_tracker = TaskTracker::new();
     let task_token = CancellationToken::new();
-
-    let worker_permits = Arc::new(Semaphore::new(max_workers));
 
     // Graceful shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
@@ -112,37 +88,15 @@ async fn main() {
         }
     });
 
-    // Diglett setup
-    let diglett = Arc::new(Diglett::new(&config, pokedex).await);
-
-    // Ping client setup
-    let ping_client = Arc::new(surge_ping::Client::new(&surge_ping::Config::new()).unwrap());
-
     // Axum API task
     let axum_task_token = task_token.clone();
-    let axum_config = config.clone();
-    let axum_worker_permits = worker_permits.clone();
-    let axum_diglett = diglett.clone();
-    let axum_ping_client = ping_client.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(axum_config, unit_uuid, jwt_keys, axum_worker_permits, axum_diglett, axum_ping_client) => {
+            () = api::run(settings, unit_uuid) => {
                 info!("Axum API task exited on its own!");
             },
             () = axum_task_token.cancelled() => {
                 info!("Axum API task cancelled succesfully!");
-            }
-        }
-    });
-
-    // Pidgeotto connection task
-    task_tracker.spawn(async move {
-        tokio::select! {
-            () = pidgeotto::run(config, worker_permits, jwt, diglett, ping_client) => {
-                info!("Pidgeotto task exited on its own!")
-            }
-            () = task_token.cancelled() => {
-                info!("Pidgeotto task cancelled succesfully!");
             }
         }
     });

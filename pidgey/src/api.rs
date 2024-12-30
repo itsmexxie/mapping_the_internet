@@ -1,6 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use config::Config;
 use mtilib::auth::{GetJWTKeys, JWTKeys};
+use serde::Serialize;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -8,10 +9,24 @@ use std::{
 use tokio::sync::Semaphore;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::diglett::Diglett;
 
-pub mod query;
+#[derive(Serialize)]
+struct UnitResponse {
+    uuid: Uuid,
+}
+
+async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
+    Json(UnitResponse {
+        uuid: *state.unit_uuid,
+    })
+}
+
+async fn health() -> impl IntoResponse {
+    StatusCode::OK
+}
 
 async fn index() -> &'static str {
     "Pidgey API, v0.1.0"
@@ -20,6 +35,7 @@ async fn index() -> &'static str {
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    pub unit_uuid: Arc<Uuid>,
     pub jwt_keys: Arc<JWTKeys>,
     pub worker_permits: Arc<Semaphore>,
     pub diglett: Arc<Diglett>,
@@ -34,6 +50,7 @@ impl GetJWTKeys for AppState {
 
 pub async fn run(
     config: Arc<Config>,
+    unit_uuid: Arc<Uuid>,
     jwt_keys: Arc<JWTKeys>,
     worker_permits: Arc<Semaphore>,
     diglett: Arc<Diglett>,
@@ -41,6 +58,7 @@ pub async fn run(
 ) {
     let state = AppState {
         config: config.clone(),
+        unit_uuid,
         jwt_keys,
         worker_permits,
         diglett,
@@ -49,7 +67,8 @@ pub async fn run(
 
     let app = Router::new()
         .route("/", get(index))
-        .nest("/query", query::router(state.clone()))
+        .route("/_unit", get(unit))
+        .route("/_health", get(health))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
     let app_port = config.get("api.port").expect("api.port must be set!");

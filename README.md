@@ -1,4 +1,17 @@
 # Mapping the Internet
+## Services
+Here is the full list of services and what they do:
+
+- Pokedex - The service list and authentication provider
+- Pidgeotto - Manages the scanning process, utilising its pidgey instances
+- Pidgey - Gathers information about an address
+- Diglett - Translation layer for plaintext data to JSON
+- Cubone - API used to access the collected data
+- Bulbasaur - Web application for viewing the data
+
+### Diagram
+![Services diagram](./services-diagram.png)
+
 ## Address
 We want to know these things about a specific address:
 - What is its allocation state (Unknown, Reserved, Unallocated, Allocated)

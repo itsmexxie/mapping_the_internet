@@ -4,15 +4,6 @@ CREATE TABLE "addressallocationstates"(
 	"name" VARCHAR(255) NOT NULL
 );
 
-CREATE TABLE "addressservers"(
-	"id" INT4 NOT NULL PRIMARY KEY,
-	"address_id" INET NOT NULL,
-	"server_id" INT4 NOT NULL,
-	"port" INT4 NOT NULL,
-	FOREIGN KEY ("address_id") REFERENCES "Addresses"("id"),
-	FOREIGN KEY ("server_id") REFERENCES "Servers"("id")
-);
-
 CREATE TABLE "addresses"(
 	"id" INET NOT NULL PRIMARY KEY,
 	"allocation_state_id" VARCHAR(16) NOT NULL,
@@ -24,6 +15,7 @@ CREATE TABLE "addresses"(
 	"asn_id" INT4,
 	"ports" INT4[] DEFAULT '{}' NOT NULL,
 	"country" VARCHAR(3),
+	"updated_at" TIMESTAMPTZ NOT NULL,
 	FOREIGN KEY ("allocation_state_id") REFERENCES "AddressAllocationStates"("id"),
 	FOREIGN KEY ("top_rir_id") REFERENCES "Rirs"("id"),
 	FOREIGN KEY ("rir_id") REFERENCES "Rirs"("id"),
@@ -37,12 +29,6 @@ CREATE TABLE "asns"(
 CREATE TABLE "rirs"(
 	"id" VARCHAR(16) NOT NULL PRIMARY KEY,
 	"name" VARCHAR(255) NOT NULL
-);
-
-CREATE TABLE "servers"(
-	"id" INT4 NOT NULL PRIMARY KEY,
-	"name" VARCHAR(255) NOT NULL,
-	"description" VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE "serviceunits"(

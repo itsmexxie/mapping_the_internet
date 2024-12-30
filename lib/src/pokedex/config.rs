@@ -1,5 +1,3 @@
-#[cfg(feature = "config")]
-use config::Config;
 use url::Url;
 
 #[derive(Clone)]
@@ -33,7 +31,7 @@ impl PokedexConfig {
     }
 
     #[cfg(feature = "config")]
-    pub fn from_config(config: &Config) -> Self {
+    pub fn from_config(config: &config::Config) -> Self {
         let unit_username = config
             .get_string("unit.username")
             .expect("unit.username must be set!");

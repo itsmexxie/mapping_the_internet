@@ -1,10 +1,20 @@
 openapi: 3.0.0
 info:
-  title: "Pidgey API"
-  description: "A service that gathers information about an IPv4 address"
+  title: "Cubone API"
+  description: "Public API for getting data from our database."
   version: "0.1.0"
 
 paths:
+  /address/{address}:
+    get:
+      summary: "Get information about an IP address"
+      parameters:
+        - $ref: "#/components/parameters/addressParam"
+      responses:
+        200:
+          description: "IP address info"
+        400:
+          description: "Malformed IP address specified"
   /_unit:
     get:
       summary: "Unit information"
@@ -25,3 +35,13 @@ paths:
       responses:
         200:
           description: "OK"
+
+
+components:
+  parameters:
+    addressParam:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 axum = "0.7.7"
 concat-string = "1.0.1"
-config = "0.14.1"
+config = "0.15.4"
 futures = "0.3.31"
 jsonwebtoken = "9.3.0"
 mtilib = { path = "../lib", features = ["axum", "config"] }
