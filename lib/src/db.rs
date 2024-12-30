@@ -3,9 +3,9 @@ use diesel::{Connection, PgConnection};
 pub fn create_conn<S: AsRef<str>>(host: S, username: S, password: S, database: S) -> PgConnection {
     let url = concat_string!(
         "postgres://",
-        &username,
+        urlencoding::encode(username.as_ref()),
         ":",
-        &password,
+        urlencoding::encode(password.as_ref()),
         "@",
         &host,
         "/",

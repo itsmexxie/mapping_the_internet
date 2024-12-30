@@ -1,6 +1,3 @@
-#[macro_use(concat_string)]
-extern crate concat_string;
-
 pub mod auth;
 pub mod pidgey;
 
