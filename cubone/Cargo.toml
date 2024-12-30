@@ -5,10 +5,12 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.7"
+chrono = { version = "0.4.39", default-features = false, features = ["serde"] }
 concat-string = "1.0.1"
 config = "0.15.4"
-diesel = { version = "2.2.4", features = ["postgres", "chrono"] }
-mtilib = { path = "../lib", features = ["config"] }
+diesel = { version = "2.2.4", features = ["postgres", "chrono", "network-address"] }
+ipnetwork = "0.20.0"
+mtilib = { path = "../lib", features = ["config", "diesel"] }
 serde = { version = "1.0.215", features = ["derive"] }
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-util = { version = "0.7.12", features = ["rt"] }

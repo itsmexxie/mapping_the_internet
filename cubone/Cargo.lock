@@ -215,6 +215,7 @@ dependencies = [
  "android-tzdata",
  "iana-time-zone",
  "num-traits",
+ "serde",
  "windows-targets",
 ]
 
@@ -318,9 +319,11 @@ name = "cubone"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "concat-string",
  "config",
  "diesel",
+ "ipnetwork",
  "mtilib",
  "serde",
  "tokio",
@@ -377,7 +380,9 @@ dependencies = [
  "byteorder",
  "chrono",
  "diesel_derives",
+ "ipnetwork",
  "itoa",
+ "libc",
  "pq-sys",
 ]
 
@@ -946,6 +951,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddc24109865250148c2e0f3d25d4f0f479571723792d3802153c60922a4fb708"
 
 [[package]]
+name = "ipnetwork"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1054,7 +1068,9 @@ dependencies = [
 name = "mtilib"
 version = "0.1.0"
 dependencies = [
+ "concat-string",
  "config",
+ "diesel",
  "reqwest",
  "serde",
  "serde_json",

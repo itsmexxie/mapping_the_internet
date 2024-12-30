@@ -1,4 +1,5 @@
 // @generated automatically by Diesel CLI.
+#![allow(non_snake_case)]
 
 diesel::table! {
     AddressAllocationStates (id) {
@@ -22,8 +23,7 @@ diesel::table! {
         top_rir_id -> Nullable<Varchar>,
         #[max_length = 16]
         rir_id -> Nullable<Varchar>,
-        asn_id -> Nullable<Int4>,
-        ports -> Array<Nullable<Int4>>,
+        autsys_id -> Nullable<Int4>,
         #[max_length = 3]
         country -> Nullable<Varchar>,
         updated_at -> Timestamptz,
@@ -31,7 +31,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    Asns (id) {
+    Autsyses (id) {
         id -> Int4,
     }
 }
@@ -69,12 +69,12 @@ diesel::table! {
 }
 
 diesel::joinable!(Addresses -> AddressAllocationStates (allocation_state_id));
-diesel::joinable!(Addresses -> Asns (asn_id));
+diesel::joinable!(Addresses -> Autsyses (autsys_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     AddressAllocationStates,
     Addresses,
-    Asns,
+    Autsyses,
     Rirs,
     ServiceUnits,
     Services,

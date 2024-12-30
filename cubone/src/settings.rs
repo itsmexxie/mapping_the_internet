@@ -4,6 +4,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub api: SettingsAPI,
+    pub database: SettingsDatabase,
     pub pokedex: SettingsPokedex,
     pub unit: SettingsUnit,
 }
@@ -40,6 +41,14 @@ impl Settings {
 #[derive(Debug, Deserialize)]
 pub struct SettingsAPI {
     pub port: u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SettingsDatabase {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+    pub database: String,
 }
 
 #[derive(Debug, Deserialize)]

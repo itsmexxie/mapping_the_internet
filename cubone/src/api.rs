@@ -3,13 +3,31 @@ use std::{
     sync::Arc,
 };
 
-use axum::{response::IntoResponse, routing::get, Router};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use concat_string::concat_string;
+use serde::Serialize;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::settings::Settings;
+
+pub mod address;
+
+#[derive(Serialize)]
+struct UnitResponse {
+    uuid: Uuid,
+}
+
+async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
+    Json(UnitResponse {
+        uuid: *state.unit_uuid,
+    })
+}
+
+async fn health() -> impl IntoResponse {
+    StatusCode::OK
+}
 
 async fn index() -> impl IntoResponse {
     concat_string!("Cubone API, v", env!("CARGO_PKG_VERSION"))
@@ -29,6 +47,9 @@ pub async fn run(settings: Arc<Settings>, unit_uuid: Arc<Uuid>) {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/_unit", get(unit))
+        .route("/_health", get(health))
+        .nest("/address", address::router())
         .with_state(state)
         .layer(TraceLayer::new_for_http());
     let app_port = settings.api.port;
