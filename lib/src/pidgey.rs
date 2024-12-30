@@ -1,10 +1,12 @@
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::Ipv4Addr};
 use uuid::Uuid;
 
 use crate::types::{AllocationState, Rir};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PidgeyCommand {
     Register,
     Deregister,
@@ -48,7 +50,8 @@ pub enum PidgeyCommand {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PidgeyCommandResponse {
     Register,
     Deregister,

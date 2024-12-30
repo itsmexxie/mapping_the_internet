@@ -1,9 +1,0 @@
--- Your SQL goes here
-DROP TABLE IF EXISTS "addressallocationstates";
-DROP TABLE IF EXISTS "addressservers";
-DROP TABLE IF EXISTS "addresses";
-DROP TABLE IF EXISTS "asns";
-DROP TABLE IF EXISTS "rirs";
-DROP TABLE IF EXISTS "servers";
-DROP TABLE IF EXISTS "serviceunits";
-DROP TABLE IF EXISTS "services";

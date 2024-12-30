@@ -28,8 +28,8 @@ async fn health() -> impl IntoResponse {
     StatusCode::OK
 }
 
-async fn index() -> &'static str {
-    "Pidgey API, v0.1.0"
+async fn index() -> impl IntoResponse {
+    concat_string!("Pidgey API, v", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(Clone)]

@@ -5,10 +5,12 @@ use axum::{
     middleware::Next,
     response::IntoResponse,
 };
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncReadExt};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct JWTClaims {
     pub id: String,
     pub srv: String,

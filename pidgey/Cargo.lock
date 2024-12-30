@@ -1143,6 +1143,7 @@ name = "mtilib"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "concat-string",
  "config",
  "jsonwebtoken",
  "reqwest",

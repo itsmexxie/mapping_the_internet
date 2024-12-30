@@ -81,15 +81,11 @@ impl Gust {
     }
 
     pub async fn attack(&self, port: u16, timeout: u32) -> bool {
-        match tokio::time::timeout(Duration::from_secs(timeout.into()), async move {
+        (tokio::time::timeout(Duration::from_secs(timeout.into()), async move {
             TcpStream::connect(SocketAddr::new(IpAddr::V4(self.0), port))
                 .await
                 .is_ok()
         })
-        .await
-        {
-            Ok(value) => value,
-            Err(_) => false,
-        }
+        .await).unwrap_or_default()
     }
 }
