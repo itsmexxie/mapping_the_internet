@@ -1,2 +1,8 @@
-config.toml
+# Configuration
+/config.toml
+
+# JWT keys
+jwt.key*
+
+# Downloaded data
 /data

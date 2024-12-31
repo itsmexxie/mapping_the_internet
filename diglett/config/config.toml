@@ -1,0 +1,57 @@
+[api]
+# port =		# Specifies the port on which the API will listen.
+# auth =		# Whether to hide the API behind an auth barrier.
+
+[pokedex]
+# address =		# The address used when connecting to a Pokedex instance.
+
+[[providers.arin.stats.sources]]
+# url = "https://ftp.arin.net/pub/stats/arin/delegated-arin-extended-latest"
+# filepath = "./data/arin/stats/arin.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.arin.stats.sources]]
+# url = "https://ftp.arin.net/pub/stats/ripencc/delegated-ripencc-latest"
+# filepath = "./data/arin/stats/ripencc.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.arin.stats.sources]]
+# url = "https://ftp.arin.net/pub/stats/apnic/delegated-apnic-latest"
+# filepath = "./data/arin/stats/apnic.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.arin.stats.sources]]
+# url = "https://ftp.arin.net/pub/stats/lacnic/delegated-lacnic-latest"
+# filepath = "./data/arin/stats/lacnic.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.arin.stats.sources]]
+# url = "https://ftp.arin.net/pub/stats/afrinic/delegated-afrinic-latest"
+# filepath = "./data/arin/stats/afrinic.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.iana.recovered.sources]]
+# url = "https://www.iana.org/assignments/ipv4-recovered-address-space/ipv4-recovered-address-space-2.csv"
+# filepath = "./data/iana/recovered.csv"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.iana.reserved.sources]]
+# url = "https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv"
+# filepath = "./data/iana/reserved.csv"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.thyme.asn_prefixes.sources]]
+# rl = "https://thyme.apnic.net/current/data-raw-table"
+# ilepath = "./data/thyme/asn_prefixes.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[[providers.thyme.rir_allocations.sources]]
+# url = "https://thyme.apnic.net/current/data-RIR-blocks"
+# filepath = "./data/thyme/rir_allocations.txt"
+# max_time =	# The time after which the downloaded file is considered "stale".
+
+[unit]
+# username =	# The username of the unit, used when logging into Pokedex.
+# password =	# The password of the unit, used when logging into Pokedex.
+# address =		# The address on which the unit is reachable, used when logging into Pokedex. (Optional.)
+# port =		# The port on which the units is reachable, used when logging into Pokedex. (Optional, only specify when the unit is not reachable on port 80 or 443.)

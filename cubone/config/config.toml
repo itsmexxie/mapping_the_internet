@@ -1,5 +1,5 @@
 [api]
-# port = # Specifies the port on which the API will listen
+# port =		# Specifies the port on which the API will listen
 
 [database]
 # host = 		# The host used when connecting to the database

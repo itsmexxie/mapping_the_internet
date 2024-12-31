@@ -6,7 +6,6 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use config::Config;
 use mtilib::{
     auth::{GetJWTKeys, JWTKeys},
     types::{AllocationState, ValueResponse},
@@ -22,7 +21,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::providers::Providers;
+use crate::{providers::Providers, settings::Settings};
 
 async fn get_allocation(
     Path(address): Path<String>,
@@ -35,7 +34,7 @@ async fn get_allocation(
             for entry in state.providers.read().await.iana.reserved.values.iter() {
                 if entry.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
-                        value: AllocationState::Reserved.id(),
+                        value: AllocationState::Reserved.id().to_string(),
                     }));
                 }
             }
@@ -43,13 +42,13 @@ async fn get_allocation(
             for entry in state.providers.read().await.stats.values.iter() {
                 if entry.cidr.address_is_in(address_bits) {
                     return Ok(Json(ValueResponse {
-                        value: entry.allocation_state.id(),
+                        value: entry.allocation_state.id().to_string(),
                     }));
                 }
             }
 
             Ok(Json(ValueResponse {
-                value: AllocationState::Unknown.id(),
+                value: AllocationState::Unknown.id().to_string(),
             }))
         }
         Err(_) => Err(StatusCode::BAD_REQUEST),
@@ -199,18 +198,16 @@ impl GetJWTKeys for AppState {
     }
 }
 
-pub struct ApiOptions {
-    pub config: Arc<Config>,
-    pub unit_uuid: Arc<Uuid>,
-    pub jwt_keys: Option<Arc<JWTKeys>>,
-    pub providers: Arc<RwLock<Providers>>,
-}
-
-pub async fn run(options: ApiOptions) {
+pub async fn run(
+    settings: Arc<Settings>,
+    unit_uuid: Arc<Uuid>,
+    jwt_keys: Option<Arc<JWTKeys>>,
+    providers: Arc<RwLock<Providers>>,
+) {
     let state = AppState {
-        unit_uuid: options.unit_uuid,
-        jwt_keys: options.jwt_keys,
-        providers: options.providers,
+        unit_uuid,
+        jwt_keys,
+        providers,
     };
 
     let mut address_router = Router::new()
@@ -219,7 +216,7 @@ pub async fn run(options: ApiOptions) {
         .route("/asn", get(get_asn))
         .route("/country", get(get_country));
 
-    if state.jwt_keys.is_some() {
+    if settings.api.auth {
         address_router = address_router.layer(middleware::from_fn_with_state(
             state.clone(),
             mtilib::auth::axum_middleware::<AppState>,
@@ -234,15 +231,13 @@ pub async fn run(options: ApiOptions) {
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
-    let app_port = options.config.get("api.port").unwrap();
-
     let listener = tokio::net::TcpListener::bind(SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-        app_port,
+        settings.api.port,
     ))
     .await
     .unwrap();
 
-    info!("Listening on port {}!", app_port);
+    info!("Listening on port {}!", settings.api.port);
     axum::serve(listener, app).await.unwrap();
 }

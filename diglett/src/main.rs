@@ -1,12 +1,13 @@
-use api::ApiOptions;
-use config::Config;
 use mtilib::{
     auth::JWTKeys,
     pokedex::{config::PokedexConfig, Pokedex},
 };
 use providers::Providers;
+use settings::Settings;
 use std::sync::Arc;
 use tokio::{
+    fs::File,
+    io,
     signal::{self, unix::SignalKind},
     sync::{Mutex, RwLock},
 };
@@ -15,15 +16,16 @@ use tracing::{error, info};
 
 pub mod api;
 pub mod providers;
-// pub mod scheduler;
+pub mod settings;
 pub mod utils;
 
 #[macro_use(concat_string)]
 extern crate concat_string;
 
 /*
+ * 0. Sprite
  * 1. Tracing
- * 2. Config
+ * 2. Settings
  * 3. Load JWT keys
  * 3. Login to Pokedex
  * 4. Tokio setup
@@ -33,20 +35,25 @@ extern crate concat_string;
  */
 #[tokio::main]
 async fn main() {
+    // Sprite
+    let sprite_file = File::open("sprite.txt")
+        .await
+        .expect("Failed to read sprite file!");
+    let mut reader = io::BufReader::new(sprite_file);
+    io::copy(&mut reader, &mut io::stdout())
+        .await
+        .expect("Failed to copy sprite to stdout!");
+
     // Tracing
     tracing_subscriber::fmt::init();
 
-    // Config
-    let config = Arc::new(
-        Config::builder()
-            .add_source(config::File::with_name("config.toml"))
-            .build()
-            .unwrap(),
-    );
+    // Settings
+    let (config, settings) = Settings::load();
+    let settings = Arc::new(settings);
 
     // Load JWT keys if api.auth is set to true
     let mut jwt_keys = None;
-    if config.get_bool("api.auth").unwrap_or(true) {
+    if settings.api.auth {
         jwt_keys = Some(Arc::new(
             JWTKeys::load_public(
                 &config
@@ -130,12 +137,7 @@ async fn main() {
     // Axum API
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(ApiOptions {
-                config,
-                unit_uuid,
-                jwt_keys,
-                providers,
-            }) => {
+            () = api::run(settings, unit_uuid, jwt_keys, providers) => {
                 info!("Axum API task exited on its own!");
             }
             () = task_token.cancelled() => {
