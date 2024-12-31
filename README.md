@@ -48,3 +48,7 @@ An IPv4 address can be in one of the following allocation states:
 - [ ] (Bulbasaur) Create the damn thing, maybe?
 - [ ] (Pidgey) Return the 500 error when Diglett responds with a 500 error
 - [ ] (Pidgeotto) Implement a timeout when waiting for a job response from Pidgey
+- [ ] (Diglett) Finish the transition to Settings
+- [ ] (Pokedex) Update example config and .gitignore
+- [ ] (Pidgeotto) Update example config and .gitignore
+- [ ] (Pidgey) Update example config and .gitignore

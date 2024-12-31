@@ -8,11 +8,11 @@
 #############
 FROM rust:latest AS builder
 
-# Build diglett
-WORKDIR /diglett
-COPY ./diglett/src ./src
-COPY ./diglett/Cargo.toml .
-COPY ./diglett/Cargo.lock .
+# Build cubone
+WORKDIR /cubone
+COPY ./cubone/src ./src
+COPY ./cubone/Cargo.toml .
+COPY ./cubone/Cargo.lock .
 COPY ./lib /lib
 
 RUN cargo build --release
@@ -31,8 +31,8 @@ RUN cargo build --release
 FROM gcr.io/distroless/cc
 
 # Copy our build
-COPY --from=builder /diglett/target/release/diglett .
+COPY --from=builder /cubone/target/release/cubone .
 COPY --from=builder /healthcheck/target/release/healthcheck .
-COPY ./diglett/sprite.txt .
+COPY ./cubone/sprite.txt .
 
-CMD ["/diglett"]
+CMD ["/cubone"]
