@@ -5,14 +5,48 @@ info:
   version: "0.1.0"
 
 paths:
+  /address:
+    get:
+      summary: "Get information about an address or a range of addresses. Specify either an address query parameter, or start and stop parameters. The maximum amount of addresses which can be queried at once is 256 (for the full 0 - 255 range)."
+      parameters:
+        - name: "address"
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: "start"
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: "stop"
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: "An array of information about address(es)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/addressInfo"
+        400:
+          description: "Malformed address in query or end address is smaller than start"
+        404:
+          description: "No record matching the provided address range was found"
   /address/{address}:
     get:
-      summary: "Get information about an IP address"
+      summary: "Get information about a specific IP address"
       parameters:
         - $ref: "#/components/parameters/addressParam"
       responses:
         200:
           description: "IP address info"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/addressInfo"
         400:
           description: "Malformed IP address specified"
         404:
@@ -38,8 +72,46 @@ paths:
         200:
           description: "OK"
 
-
 components:
+  schemas:
+    addressInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        allocation_state_id:
+          type: string
+          enum:
+            - "unknown"
+            - "unallocated"
+            - "reserved"
+            - "allocated"
+        allocation_state_comment:
+          type: string
+        routed:
+          type: boolean
+        online:
+          type: boolean
+        top_rir:
+          $ref: "#/components/schemas/rir_enum"
+        rir:
+          $ref: "#/components/schemas/rir_enum"
+        autsys:
+          type: number
+        country:
+          type: string
+        updated_at:
+          type: string
+    rir_enum:
+      type: string
+      enum:
+        - "arin"
+        - "ripencc"
+        - "apnic"
+        - "lacnic"
+        - "afrinic"
+        - "other"
+        - "unknown"
   parameters:
     addressParam:
       name: address
