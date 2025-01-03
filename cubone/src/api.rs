@@ -3,7 +3,15 @@ use std::{
     sync::Arc,
 };
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    body::Body,
+    extract::State,
+    http::{header, Request, StatusCode},
+    middleware::Next,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use concat_string::concat_string;
 use serde::Serialize;
 use tower_http::trace::TraceLayer;
@@ -13,6 +21,14 @@ use uuid::Uuid;
 use crate::settings::Settings;
 
 pub mod address;
+pub mod map;
+
+pub async fn access_control_header(req: Request<Body>, next: Next) -> impl IntoResponse {
+    let mut res = next.run(req).await;
+    res.headers_mut()
+        .insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*".parse().unwrap());
+    res
+}
 
 #[derive(Serialize)]
 struct UnitResponse {
@@ -50,7 +66,9 @@ pub async fn run(settings: Arc<Settings>, unit_uuid: Arc<Uuid>) {
         .route("/_unit", get(unit))
         .route("/_health", get(health))
         .nest("/address", address::router())
+        .nest("/map", map::router())
         .with_state(state)
+        .layer(axum::middleware::from_fn(access_control_header))
         .layer(TraceLayer::new_for_http());
     let app_port = settings.api.port;
 

@@ -11,6 +11,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    AddressMaps (id) {
+        id -> Cidr,
+        #[max_length = 16]
+        allocation_state_id -> Varchar,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     Addresses (id) {
         id -> Inet,
         #[max_length = 16]
@@ -73,6 +82,7 @@ diesel::joinable!(Addresses -> Autsyses (autsys_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     AddressAllocationStates,
+    AddressMaps,
     Addresses,
     Autsyses,
     Rirs,
