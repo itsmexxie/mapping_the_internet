@@ -101,14 +101,27 @@ pub async fn map(
         &*state.settings.database.database,
     );
 
-    let network = Ipv4Network::new(
-        match Ipv4Addr::from_str(&address) {
-            Ok(addr) => addr,
+    // Double parsing network because we want all zeros on host bits
+    // Fix by making get_average_block return an error when DB refuses the address since
+    // that's the reason we are doing this...
+    let network = match Ipv4Network::new(
+        match Ipv4Network::new(
+            match Ipv4Addr::from_str(&address) {
+                Ok(addr) => addr,
+                Err(_) => return Err(StatusCode::BAD_REQUEST),
+            },
+            prefix,
+        ) {
+            Ok(network) => network.network(),
             Err(_) => return Err(StatusCode::BAD_REQUEST),
         },
         prefix,
-    )
-    .unwrap();
+    ) {
+        Ok(network) => network,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    println!("{}", network);
 
     Ok(get_block_average(network, &mut conn).id().to_string())
 }
