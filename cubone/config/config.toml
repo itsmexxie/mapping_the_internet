@@ -2,7 +2,7 @@
 # port =		# Specifies the port on which the API will listen
 
 [database]
-# host = 		# The host used when connecting to the database
+# hostname = 		# The host used when connecting to the database
 # username = 	# The username used when connecting to the database
 # password = 	# The password used when connecting to the database
 # database = 	# The target database used when connecting to the database

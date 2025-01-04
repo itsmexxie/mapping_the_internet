@@ -1,0 +1,9 @@
+{
+	"rust-analyzer.cargo.features": [
+		"axum",
+		"config",
+		"diesel",
+		"serde",
+		"sqlx"
+	]
+}

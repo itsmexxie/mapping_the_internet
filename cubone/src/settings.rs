@@ -45,7 +45,7 @@ pub struct SettingsAPI {
 
 #[derive(Debug, Deserialize)]
 pub struct SettingsDatabase {
-    pub host: String,
+    pub hostname: String,
     pub username: String,
     pub password: String,
     pub database: String,

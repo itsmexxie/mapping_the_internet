@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use mtilib::pokedex::{config::PokedexConfig, Pokedex};
 use settings::Settings;
+use sqlx::PgPool;
 use tokio::{
     fs::File,
     io,
@@ -13,9 +14,24 @@ use tracing::{error, info};
 
 pub mod api;
 pub mod models;
-pub mod schema;
 pub mod settings;
 
+/*
+ * == STATIC ==
+ * 1. Sprite
+ * 2. Tracing
+ * 3. Settings
+ * 4. Load JWT keys
+ * == POKEDEX ==
+ * 5. Login to Pokedex
+ * == TOKIO ==
+ * 6. Tokio setup
+ * 7. Graceful shutdown task
+ * == RUNTIME ==
+ * 8. Create database connection pool
+ * 9. Load providers
+ * 10. Axum API task
+ */
 #[tokio::main]
 async fn main() {
     // Sprite
@@ -88,11 +104,23 @@ async fn main() {
         }
     });
 
+    // Create database connection pool
+    let db_pool = Arc::new(
+        PgPool::connect(&mtilib::db::url(
+            &*settings.database.hostname,
+            &*settings.database.username,
+            &*settings.database.password,
+            &*settings.database.database,
+        ))
+        .await
+        .unwrap(),
+    );
+
     // Axum API task
     let axum_task_token = task_token.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(settings, unit_uuid) => {
+            () = api::run(settings, unit_uuid, db_pool) => {
                 info!("Axum API task exited on its own!");
             },
             () = axum_task_token.cancelled() => {

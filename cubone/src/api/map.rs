@@ -1,131 +1,146 @@
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
+use std::{collections::HashMap, future::Future, net::Ipv4Addr, pin::Pin, str::FromStr};
 
-use axum::extract::{Path, State};
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
-use diesel::query_dsl::methods::FindDsl;
-use diesel::{PgConnection, RunQueryDsl};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::get,
+    Router,
+};
 use ipnetwork::{IpNetwork, Ipv4Network};
 use mtilib::types::AllocationState;
+use sqlx::Error;
 use tracing::debug;
 
-use crate::models::{Address, AddressMap, NewAddressMap};
-use crate::schema::{AddressMaps, Addresses};
+use crate::models::{Address, AddressMap};
 
 use super::AppState;
 
-// This shit NEEDS to be parallelized
-// *Ahem* where is my academic language, sorry...
-// This procedure is very slow indeed, and in serious need of parallelization due to serial calls to the database *adjusts bowtie*
-fn get_block_average(network: Ipv4Network, conn: &mut PgConnection) -> AllocationState {
-    match AddressMaps::dsl::AddressMaps
-        .find(IpNetwork::V4(network))
-        .first::<AddressMap>(conn)
-    {
-        Ok(map) => AllocationState::from_str(&map.allocation_state_id).unwrap(),
-        Err(_) => {
-            debug!("cached map for {} not found, calculating...", network);
-            let start = network.network().to_bits();
-            let mut state_occurence = HashMap::new();
+pub fn get_network_average(
+    network: Ipv4Network,
+    db_pool: mtilib::db::DbPool,
+) -> Pin<Box<dyn Future<Output = Result<AllocationState, Error>> + Send>> {
+    Box::pin(async move {
+        let wrapped_network = IpNetwork::V4(network);
 
-            if network.prefix() == 24 {
-                for i in 0..=u8::MAX {
-                    let new_address = Ipv4Addr::from_bits(start + i as u32);
+        match sqlx::query_as::<_, AddressMap>(
+            r#"
+			SELECT *
+			FROM "AddressMaps"
+			WHERE id = $1
+			"#,
+        )
+        .bind(wrapped_network)
+        .fetch_one(&mut *db_pool.acquire().await.unwrap())
+        .await
+        {
+            Ok(state) => Ok(AllocationState::from_str(&state.allocation_state_id).unwrap()),
+            Err(error) => match error {
+                Error::RowNotFound => {
+                    debug!("cached map for {} not found, calculating...", network);
+                    let start = network.network().to_bits();
+                    let mut state_occurence: HashMap<AllocationState, u32> = HashMap::new();
 
-                    match Addresses::dsl::Addresses
-                        .find(IpNetwork::V4(new_address.into()))
-                        .first::<Address>(conn)
-                    {
-                        Ok(db_address) => {
+                    if network.prefix() == 24 {
+                        match sqlx::query_as::<_, Address>(
+                            r#"
+							SELECT *
+							FROM "Addresses"
+							WHERE id << $1
+							"#,
+                        )
+                        .bind(wrapped_network)
+                        .fetch_all(&mut *db_pool.acquire().await.unwrap())
+                        .await
+                        {
+                            Ok(rows) => {
+                                let mut i = 0;
+                                for row in rows {
+                                    *state_occurence
+                                        .entry(
+                                            AllocationState::from_str(&row.allocation_state_id)
+                                                .unwrap(),
+                                        )
+                                        .or_insert(0) += 1;
+                                    i += 1;
+                                }
+
+                                *state_occurence.entry(AllocationState::Unknown).or_insert(0) +=
+                                    256 - i;
+                            }
+                            Err(error) => return Err(error),
+                        }
+                    } else {
+                        let shift = 24 - network.prefix();
+                        let new_prefix = network.prefix() + 8;
+
+                        for i in 0..=u8::MAX {
+                            let new_network = Ipv4Network::new(
+                                Ipv4Addr::from_bits(start + ((i as u32) << shift)),
+                                new_prefix,
+                            )
+                            .unwrap();
+
                             *state_occurence
                                 .entry(
-                                    AllocationState::from_str(&db_address.allocation_state_id)
-                                        .unwrap(),
+                                    match get_network_average(new_network, db_pool.clone()).await {
+                                        Ok(average) => average,
+                                        Err(error) => return Err(error),
+                                    },
                                 )
-                                .or_insert(0) += 1
-                        }
-                        Err(_) => {
-                            *state_occurence.entry(AllocationState::Unknown).or_insert(0) += 1
+                                .or_insert(0) += 1;
                         }
                     }
-                }
-            } else {
-                let shift = 24 - network.prefix();
-                let new_prefix = network.prefix() + 8;
 
-                for i in 0..=u8::MAX {
-                    let new_network = Ipv4Network::new(
-                        Ipv4Addr::from_bits(start + ((i as u32) << shift)),
-                        new_prefix,
+                    let max = state_occurence
+                        .iter()
+                        .max_by(|a, b| a.1.cmp(b.1))
+                        .map(|(k, _v)| k)
+                        .unwrap_or(&AllocationState::Unknown);
+
+                    sqlx::query(
+                        r#"
+						INSERT INTO "AddressMaps" (id, allocation_state_id)
+						VALUES ($1, $2)
+						"#,
                     )
+                    .bind(wrapped_network)
+                    .bind(max.id())
+                    .execute(&mut *db_pool.acquire().await.unwrap())
+                    .await
                     .unwrap();
 
-                    *state_occurence
-                        .entry(get_block_average(new_network, conn))
-                        .or_insert(0) += 1;
+                    Ok(max.clone())
                 }
-            }
-
-            let max = state_occurence
-                .iter()
-                .max_by(|a, b| a.1.cmp(&b.1))
-                .map(|(k, _v)| k)
-                .unwrap();
-
-            diesel::insert_into(AddressMaps::table)
-                .values(&NewAddressMap {
-                    id: IpNetwork::V4(network),
-                    allocation_state_id: max.id().to_string(),
-                })
-                .execute(conn)
-                .unwrap();
-
-            return max.clone();
+                _ => Err(error),
+            },
         }
-    }
+    })
 }
 
-pub async fn map(
-    Path((address, prefix)): Path<(String, u8)>,
+pub async fn map_one(
+    Path((address, prefix_length)): Path<(String, u8)>,
     State(state): State<AppState>,
-) -> impl IntoResponse {
-    if ![8, 16, 24].contains(&prefix) {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    let mut conn = mtilib::db::create_conn(
-        &*state.settings.database.host,
-        &*state.settings.database.username,
-        &*state.settings.database.password,
-        &*state.settings.database.database,
-    );
-
-    // Double parsing network because we want all zeros on host bits
-    // Fix by making get_average_block return an error when DB refuses the address since
-    // that's the reason we are doing this...
-    let network = match Ipv4Network::new(
-        match Ipv4Network::new(
-            match Ipv4Addr::from_str(&address) {
-                Ok(addr) => addr,
-                Err(_) => return Err(StatusCode::BAD_REQUEST),
-            },
-            prefix,
-        ) {
-            Ok(network) => network.network(),
+) -> Result<String, StatusCode> {
+    let target_network = match Ipv4Network::new(
+        match Ipv4Addr::from_str(&address) {
+            Ok(addr) => addr,
             Err(_) => return Err(StatusCode::BAD_REQUEST),
         },
-        prefix,
+        prefix_length,
     ) {
         Ok(network) => network,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
 
-    println!("{}", network);
-
-    Ok(get_block_average(network, &mut conn).id().to_string())
+    match get_network_average(target_network, state.db_pool.clone()).await {
+        Ok(average) => Ok(average.id().to_string()),
+        Err(error) => {
+            println!("{}", error);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/{address}/{prefix}", get(map))
+    Router::new().route("/{address}/{prefix_length}", get(map_one))
 }

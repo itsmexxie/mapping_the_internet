@@ -1,6 +1,3 @@
-#[macro_use(concat_string)]
-extern crate concat_string;
-
 pub mod auth;
 pub mod pidgey;
 
@@ -8,5 +5,5 @@ pub mod pidgey;
 pub mod pokedex;
 pub mod types;
 
-#[cfg(feature = "diesel")]
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
 pub mod db;

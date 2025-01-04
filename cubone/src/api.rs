@@ -53,12 +53,14 @@ async fn index() -> impl IntoResponse {
 pub struct AppState {
     pub settings: Arc<Settings>,
     pub unit_uuid: Arc<Uuid>,
+    pub db_pool: mtilib::db::DbPool,
 }
 
-pub async fn run(settings: Arc<Settings>, unit_uuid: Arc<Uuid>) {
+pub async fn run(settings: Arc<Settings>, unit_uuid: Arc<Uuid>, db_pool: mtilib::db::DbPool) {
     let state = AppState {
         settings: settings.clone(),
         unit_uuid,
+        db_pool,
     };
 
     let app = Router::new()
