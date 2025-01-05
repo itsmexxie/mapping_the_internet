@@ -9,7 +9,7 @@ chrono = { version = "0.4.39", default-features = false, features = ["serde"] }
 concat-string = "1.0.1"
 config = { version = "0.15.4", default-features = false, features = ["toml"] }
 ipnetwork = "0.20.0"
-mtilib = { path = "../lib", features = ["serde", "settings", "sqlx"] }
+mtilib = { path = "../lib", features = ["serde", "settings", "sqlx", "pokedex-v2"] }
 serde = { version = "1.0.215", features = ["derive"] }
 sqlx = { version = "0.8.3", features = ["postgres", "chrono", "ipnetwork", "runtime-tokio", "tls-rustls"] }
 tokio = { version = "1.41.1", features = ["full"] }

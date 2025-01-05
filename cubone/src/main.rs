@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
-use mtilib::pokedex::{config::PokedexConfig, Pokedex};
+use mtilib::pokedex::{Pokedex, Url};
 use settings::Settings;
 use sqlx::PgPool;
 use tokio::{
     fs::File,
     io,
     signal::{self, unix::SignalKind},
-    sync::Mutex,
+    sync::{oneshot, Mutex},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub mod api;
 pub mod models;
@@ -47,24 +48,40 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Settings
-    let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
+    let (_, settings) = mtilib::settings::deserialize_from_config("config.toml");
     let settings: Arc<Settings> = Arc::new(settings);
 
     // Login to Pokedex
-    let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
-        &config,
-    ))));
+    let pokedex = Arc::new(Mutex::new(
+        Pokedex::login(
+            &Url::parse(&settings.pokedex.address).expect("Failed to parse Pokedex url"),
+            &settings.unit.username,
+            &settings.unit.password,
+        )
+        .await
+        .unwrap(),
+    ));
 
-    let unit_uuid = match pokedex.lock().await.login().await {
-        Ok(res) => {
-            info!("Successfully logged into Pokedex!");
-            Arc::new(res.uuid)
+    let unit_uuid = Arc::new(match settings.unit.address.as_ref() {
+        Some(unit_address) => {
+            let (register_tx, register_rx) = oneshot::channel::<Uuid>();
+
+            let unit_port = match settings.unit.announce_port {
+                true => Some(settings.api.port),
+                false => None,
+            };
+
+            pokedex
+                .lock()
+                .await
+                .register(unit_address, unit_port, register_tx)
+                .await;
+
+            info!("Successfully registered the unit to Pokedex!");
+            Some(register_rx.await.unwrap())
         }
-        Err(error) => {
-            error!(error);
-            panic!()
-        }
-    };
+        None => None,
+    });
 
     // Tokio setup
     let task_tracker = TaskTracker::new();
@@ -73,14 +90,13 @@ async fn main() {
     // Graceful shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
-    let signal_task_pokedex = pokedex.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        signal_task_pokedex.lock().await.logout().await;
+                        // signal_task_pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -94,7 +110,7 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout().await;
+                // signal_task_pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks

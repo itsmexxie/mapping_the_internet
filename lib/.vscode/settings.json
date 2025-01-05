@@ -3,6 +3,7 @@
 		"axum",
 		"settings",
 		"diesel",
+        "pokedex-v2",
 		"serde",
 		"sqlx"
 	]

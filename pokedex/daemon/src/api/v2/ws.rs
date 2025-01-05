@@ -5,25 +5,14 @@ use axum::{
     Router,
 };
 use futures::{SinkExt, StreamExt};
-use mtilib::auth::JWTClaimsv2;
-use serde::{Deserialize, Serialize};
+use mtilib::{
+    auth::JWTClaimsv2,
+    pokedex::{PokedexMessage, UnitMessage},
+};
 use tracing::info;
 use uuid::Uuid;
 
 use crate::api::AppState;
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum UnitMessage {
-    Register {
-        token: String,
-        address: String,
-        port: Option<i32>,
-    },
-    Error {
-        message: String,
-    },
-}
 
 pub async fn register(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| unit_handler(socket, state))
@@ -46,7 +35,7 @@ async fn unit_handler(socket: WebSocket, state: AppState) {
                             if unit_uuid.is_some() {
                                 sender
                                     .send(axum::extract::ws::Message::Text(
-                                        serde_json::to_string(&UnitMessage::Error {
+                                        serde_json::to_string(&PokedexMessage::Error {
                                             message: String::from("Already registered!"),
                                         })
                                         .unwrap()
@@ -65,6 +54,10 @@ async fn unit_handler(socket: WebSocket, state: AppState) {
                             ) {
                                 Ok(token) => {
                                     unit_uuid = Some(Uuid::new_v4());
+                                    let unit_port = match port {
+                                        Some(port) => Some(port as i32),
+                                        None => None,
+                                    };
 
                                     info!("Registered unit {:?}", unit_uuid.unwrap());
 
@@ -77,14 +70,18 @@ async fn unit_handler(socket: WebSocket, state: AppState) {
                                     .bind(unit_uuid.unwrap())
                                     .bind(token.claims.sub)
                                     .bind(address)
-                                    .bind(port)
+                                    .bind(unit_port)
                                     .execute(&mut *state.db_pool.acquire().await.unwrap())
                                     .await
                                     .unwrap();
 
                                     sender
                                         .send(axum::extract::ws::Message::Text(
-                                            String::from(unit_uuid.unwrap()).into(),
+                                            serde_json::to_string(&PokedexMessage::Registered {
+                                                uuid: unit_uuid.unwrap(),
+                                            })
+                                            .unwrap()
+                                            .into(),
                                         ))
                                         .await
                                         .unwrap();
@@ -98,11 +95,10 @@ async fn unit_handler(socket: WebSocket, state: AppState) {
                                 }
                             }
                         }
-                        _ => {}
                     },
                     Err(_) => sender
                         .send(axum::extract::ws::Message::Text(
-                            serde_json::to_string(&UnitMessage::Error {
+                            serde_json::to_string(&PokedexMessage::Error {
                                 message: String::from("Failed to parse message!"),
                             })
                             .unwrap()

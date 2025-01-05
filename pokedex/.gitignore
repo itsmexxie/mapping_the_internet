@@ -1,3 +1,6 @@
+# Config
 /*.config.toml
+
+# JWT keys
 /jwt.key
 /jwt.key.pub

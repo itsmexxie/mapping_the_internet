@@ -32,7 +32,7 @@ pub async fn access_control_header(req: Request<Body>, next: Next) -> impl IntoR
 
 #[derive(Serialize)]
 struct UnitResponse {
-    uuid: Uuid,
+    uuid: Option<Uuid>,
 }
 
 async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
@@ -52,11 +52,15 @@ async fn index() -> impl IntoResponse {
 #[derive(Clone)]
 pub struct AppState {
     pub settings: Arc<Settings>,
-    pub unit_uuid: Arc<Uuid>,
+    pub unit_uuid: Arc<Option<Uuid>>,
     pub db_pool: mtilib::db::DbPool,
 }
 
-pub async fn run(settings: Arc<Settings>, unit_uuid: Arc<Uuid>, db_pool: mtilib::db::DbPool) {
+pub async fn run(
+    settings: Arc<Settings>,
+    unit_uuid: Arc<Option<Uuid>>,
+    db_pool: mtilib::db::DbPool,
+) {
     let state = AppState {
         settings: settings.clone(),
         unit_uuid,

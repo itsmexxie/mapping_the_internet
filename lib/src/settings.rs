@@ -4,19 +4,19 @@ use serde::Deserialize;
 
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
+pub struct SettingsAPI {
+    pub port: u16,
+    #[cfg_attr(feature = "serde", serde(default = "default_api_auth"))]
+    pub auth: bool,
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct SettingsDatabase {
     pub hostname: String,
     pub username: String,
     pub password: String,
     pub database: String,
-}
-
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Deserialize))]
-pub struct SettingsAPI {
-    pub port: u16,
-    #[cfg_attr(feature = "serde", serde(default = "default_api_auth"))]
-    pub auth: bool,
 }
 
 #[derive(Debug)]
