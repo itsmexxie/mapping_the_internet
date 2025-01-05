@@ -17,6 +17,14 @@ pub struct JWTClaims {
     pub srv: String,
     pub exp: u64,
 }
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct JWTClaimsv2 {
+    pub sub: String,
+    pub exp: u64,
+}
+
 pub struct JWTKeys {
     pub private: Option<Vec<u8>>,
     pub public: Vec<u8>,

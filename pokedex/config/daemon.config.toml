@@ -5,7 +5,7 @@
 [api.jwt]
 # private = "jwt.key"		# Specifies the location of the private JWT key used for auth. Defaults to `jwt.key`.
 # public = "jwt.key.pub"	# Specifies the location of the public JWT key used for auth. Defaults to `jwt.key.pub`.
-# expiry = 2592000			# Expiration time of the generated JWT, in seconds. Defaults to 30 days.
+# expiry = 3600				# Expiration time of the generated JWT, in seconds. Defaults to 30 days.
 
 [database]
 # hostname = 				# The host used when connecting to the database.

@@ -81,6 +81,33 @@ paths:
           description: "OK"
         401:
           description: "No or invalid service token provided"
+  /v2/auth/login:
+    post:
+      summary: "Login using the provided service credentials. Returns a JWT which can be used to authorize the unit across the network. Unlike the v1 gateway this doesn't register the unit to Pokedex (see /v2/ws)."
+      requestBody:
+        description: "Login credentials"
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+            example:
+              username: crawler
+              password: averysecurepassword
+      responses:
+        200:
+          description: "OK"
+          content:
+            text/plain:
+              schema:
+                type: string
+        401:
+          description: "Wrong username and/or password"
   /v1/services:
     get:
       summary: "Returns a list of defined services"
