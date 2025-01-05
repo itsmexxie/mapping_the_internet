@@ -30,7 +30,7 @@ paths:
       responses:
         200:
           description: "OK"
-  /auth/login:
+  /v1/auth/login:
     post:
       summary: "Login using the provided service credentials. Automatically registers the client as a service unit if an IP address and port is specified."
       requestBody:
@@ -71,7 +71,7 @@ paths:
           description: "Wrong username and/or password"
         403:
           description: "The service has max_one set to true and there is already a unit running somewhere"
-  /auth/logout:
+  /v1/auth/logout:
     post:
       summary: "Logout using the provided service token and deregister the corresponding unit"
       parameters:
@@ -81,7 +81,7 @@ paths:
           description: "OK"
         401:
           description: "No or invalid service token provided"
-  /services:
+  /v1/services:
     get:
       summary: "Returns a list of defined services"
       parameters:
@@ -91,7 +91,7 @@ paths:
           description: "A list of services"
         401:
           description: "No or invalid service token provided"
-  /services/{id}:
+  /v1/services/{id}:
     get:
       summary: "Returns the specified service"
       parameters:
@@ -101,7 +101,7 @@ paths:
           description: "Service object, including available units"
         401:
           description: "No or invalid service token provided"
-  /services/{id}/units:
+  /v1/services/{id}/units:
     get:
       summary: "Returns the available units for the specified service type"
       parameters:
