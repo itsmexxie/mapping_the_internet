@@ -1,10 +1,11 @@
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::{http::StatusCode, routing::post, Json, Router};
+use axum::{http::StatusCode, Json, Router};
+use concat_string::concat_string;
 use config::Config;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use mtilib::auth::{GetJWTKeys, JWTKeys};
+use mtilib::db::DbPool;
 use serde::Serialize;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -12,87 +13,71 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::models::{Service, ServiceUnit};
-use crate::schema::{ServiceUnits, Services};
+use mtilib::db::models::{Service, ServiceUnit};
 
 pub mod auth;
 
-#[derive(Serialize)]
-struct ApiService {
-    id: i32,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct ApiServiceUnit {
-    id: String,
-    service_id: i32,
-    address: Option<String>,
-    port: Option<i32>,
-}
-
-async fn get_services(
-    State(api_state): State<AppState>,
-) -> Result<Json<Vec<ApiService>>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&api_state.config);
-
-    let query_results = Services::dsl::Services
-        .select(Service::as_select())
-        .load(pg_conn)
-        .unwrap();
-
-    let mut api_results = Vec::new();
-    for query_result in query_results {
-        api_results.push(ApiService {
-            id: query_result.id,
-            name: query_result.name,
-        });
+async fn get_services(State(state): State<AppState>) -> Result<Json<Vec<Service>>, StatusCode> {
+    match sqlx::query_as::<_, Service>(
+        r#"
+		SELECT *
+		FROM "Services"
+		"#,
+    )
+    .fetch_all(&mut *state.db_pool.acquire().await.unwrap())
+    .await
+    {
+        Ok(row) => Ok(Json(row)),
+        Err(error) => match error {
+            _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        },
     }
-
-    Ok(Json(api_results))
 }
 
 async fn get_service(
-    Path(service_id): Path<i32>,
+    Path(service_id): Path<String>,
     State(state): State<AppState>,
-) -> Result<Json<ApiService>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&state.config);
-
-    let query_result = Services::dsl::Services
-        .filter(Services::id.eq(service_id))
-        .select(Service::as_select())
-        .first(pg_conn)
-        .unwrap();
-
-    Ok(Json(ApiService {
-        id: query_result.id,
-        name: query_result.name,
-    }))
+) -> Result<Json<Service>, StatusCode> {
+    match sqlx::query_as::<_, Service>(
+        r#"
+		SELECT *
+		FROM "Services"
+		WHERE id = $1
+		"#,
+    )
+    .bind(service_id)
+    .fetch_one(&mut *state.db_pool.acquire().await.unwrap())
+    .await
+    {
+        Ok(row) => Ok(Json(row)),
+        Err(error) => match error {
+            sqlx::Error::RowNotFound => Err(StatusCode::NOT_FOUND),
+            _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        },
+    }
 }
 
 async fn get_service_units(
     Path(service_id): Path<i32>,
     State(state): State<AppState>,
-) -> Result<Json<Vec<ApiServiceUnit>>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&state.config);
-
-    let query_results: Vec<ServiceUnit> = ServiceUnits::dsl::ServiceUnits
-        .filter(ServiceUnits::service_id.eq(service_id))
-        .select(ServiceUnit::as_select())
-        .load(pg_conn)
-        .unwrap();
-
-    let mut api_results = Vec::new();
-    for result in query_results {
-        api_results.push(ApiServiceUnit {
-            id: result.id,
-            service_id: result.service_id,
-            address: result.address,
-            port: result.port,
-        })
+) -> Result<Json<Vec<ServiceUnit>>, StatusCode> {
+    match sqlx::query_as::<_, ServiceUnit>(
+        r#"
+		SELECT *
+		FROM "ServiceUnits"
+		WHERE service_id = $1
+		"#,
+    )
+    .bind(service_id)
+    .fetch_all(&mut *state.db_pool.acquire().await.unwrap())
+    .await
+    {
+        Ok(rows) => Ok(Json(rows)),
+        Err(error) => match error {
+            sqlx::Error::RowNotFound => Err(StatusCode::NOT_FOUND),
+            _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        },
     }
-
-    Ok(Json(api_results))
 }
 
 #[derive(Serialize)]
@@ -101,7 +86,9 @@ struct UnitResponse {
 }
 
 async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
-    Json(UnitResponse { uuid: *state.uuid })
+    Json(UnitResponse {
+        uuid: *state.unit_uuid,
+    })
 }
 
 async fn health() -> impl IntoResponse {
@@ -116,7 +103,8 @@ async fn index() -> impl IntoResponse {
 pub struct AppState {
     pub config: Arc<Config>,
     pub jwt_keys: Arc<JWTKeys>,
-    pub uuid: Arc<Uuid>,
+    pub unit_uuid: Arc<Uuid>,
+    pub db_pool: DbPool,
 }
 
 impl GetJWTKeys for AppState {
@@ -125,11 +113,17 @@ impl GetJWTKeys for AppState {
     }
 }
 
-pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, uuid: Arc<Uuid>) {
+pub async fn run(
+    config: Arc<Config>,
+    jwt_keys: Arc<JWTKeys>,
+    unit_uuid: Arc<Uuid>,
+    db_pool: DbPool,
+) {
     let state = AppState {
         config: config.clone(),
         jwt_keys,
-        uuid,
+        unit_uuid,
+        db_pool,
     };
 
     let app = Router::new()
@@ -137,25 +131,14 @@ pub async fn run(config: Arc<Config>, jwt_keys: Arc<JWTKeys>, uuid: Arc<Uuid>) {
             "/services",
             Router::new()
                 .route("/", get(get_services))
-                .route("/:service_id", get(get_service))
-                .route("/:service_id/units", get(get_service_units))
+                .route("/{service_id}", get(get_service))
+                .route("/{service_id}/units", get(get_service_units))
                 .layer(axum::middleware::from_fn_with_state(
                     state.clone(),
                     mtilib::auth::axum_middleware::<AppState>,
                 )),
         )
-        .nest(
-            "/auth",
-            Router::new()
-                .route("/login", post(auth::login_index))
-                .route(
-                    "/logout",
-                    post(auth::logout_index).layer(axum::middleware::from_fn_with_state(
-                        state.clone(),
-                        mtilib::auth::axum_middleware::<AppState>,
-                    )),
-                ),
-        )
+        .nest("/auth", auth::router(state.clone()))
         .route("/_unit", get(unit))
         .route("/_health", get(health))
         .route("/", get(index))

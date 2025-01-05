@@ -47,8 +47,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Settings
-    let (config, settings) = Settings::load();
-    let settings = Arc::new(settings);
+    let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
+    let settings: Arc<Settings> = Arc::new(settings);
 
     // Login to Pokedex
     let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(

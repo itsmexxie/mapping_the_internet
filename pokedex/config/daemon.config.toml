@@ -1,6 +1,6 @@
 # Example config for the daemon
 [api]
-# port =					# Specifies the port for the Axum API to listen on
+# port =					# Specifies the port on which the API will listen.
 
 [api.jwt]
 # private = "jwt.key"		# Specifies the location of the private JWT key used for auth. Defaults to `jwt.key`.
@@ -8,11 +8,12 @@
 # expiry = 2592000			# Expiration time of the generated JWT, in seconds. Defaults to 30 days.
 
 [database]
-# host =
-# username =
-# password =
-# database =
+# hostname = 				# The host used when connecting to the database.
+# username = 				# The username used when connecting to the database.
+# password = 				# The password used when connecting to the database.
+# database = 				# The target database used when connecting to the database.
 
 [unit]
+# username = "pokedex"		# Specifies the username used when looking up the service id. Defaults to `pokedex`.
 # address =					# Specifies the address to announce to the service units database.
 # announce_port = false		# Specifies whether to announce the api.port to the service units database. Defaults to false.

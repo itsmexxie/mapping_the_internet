@@ -8,11 +8,12 @@ use axum::{
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncReadExt};
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct JWTClaims {
-    pub id: String,
+    pub id: Uuid,
     pub srv: String,
     pub exp: u64,
 }

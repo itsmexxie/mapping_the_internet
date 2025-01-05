@@ -21,6 +21,13 @@ pub struct ServicesArgs {
 #[derive(Subcommand)]
 pub enum ServiceCommands {
     List,
-    Create { name: String, password: String },
-    Delete { id: i32 },
+    Create {
+        name: String,
+        password: String,
+        #[clap(long, default_value_t = false)]
+        max_one: bool,
+    },
+    Delete {
+        id: i32,
+    },
 }

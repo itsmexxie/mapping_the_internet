@@ -1,44 +1,37 @@
-use config::Config;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use mtilib::auth::JWTKeys;
-use std::{str::FromStr, sync::Arc};
+use settings::Settings;
+use sqlx::PgPool;
+use std::sync::Arc;
 use tokio::signal::{self, unix::SignalKind};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 use uuid::Uuid;
 
-#[macro_use(concat_string)]
-extern crate concat_string;
-
 pub mod api;
-pub mod db;
-pub mod models;
-pub mod schema;
-
-use models::{NewServiceUnit, Service, ServiceUnit};
-use schema::{ServiceUnits, Services};
+pub mod settings;
 
 /*
+ * == STATIC ==
  * 1. Tracing
- * 2. Config
+ * 2. Settings
  * 3. Load JWT keys
- * 3. Register unit with database
- * 4. Tokio setup
- * 5. Graceful shutdown task
- * 6. Axum API task
+ * == POKEDEX ==
+ * 4. Register unit with database
+ * == TOKIO ==
+ * 5. Tokio setup
+ * 6. Graceful shutdown task
+ * == RUNTIME ==
+ * 7. Create database connection pool
+ * 8. Axum API task
  */
 #[tokio::main]
 async fn main() {
     // Tracing
     tracing_subscriber::fmt::init();
 
-    // Config
-    let config = Arc::new(
-        Config::builder()
-            .add_source(config::File::with_name("daemon.config.toml"))
-            .build()
-            .unwrap(),
-    );
+    // Settings
+    let (config, settings) = mtilib::settings::deserialize_from_config("daemon.config.toml");
+    let settings: Arc<Settings> = Arc::new(settings);
 
     // JWT keys
     let jwt_keys = Arc::new(
@@ -53,39 +46,42 @@ async fn main() {
         .await,
     );
 
-    // Register service with database
-    let mut pg_conn = db::create_conn(&config);
-    let service_query = Services::table
-        .select(Service::as_select())
-        .filter(Services::name.eq("pokedex"))
-        .first(&mut pg_conn)
-        .unwrap();
+    // Create database connection pool
+    let db_pool = Arc::new(
+        PgPool::connect(&mtilib::db::url(
+            &*settings.database.hostname,
+            &*settings.database.username,
+            &*settings.database.password,
+            &*settings.database.database,
+        ))
+        .await
+        .unwrap(),
+    );
 
-    let pokedex_unit_port = match config.get_string("unit.announce_port") {
-        Ok(value) => match value.as_str() {
-            "true" | "t" | "1" => {
-                Some(config.get_int("api.port").expect("api.port must be set!") as i32)
-            }
-            _ => None,
-        },
-        Err(_) => None,
+    // Register service with database
+    let unit_uuid = Arc::new(Uuid::new_v4());
+    let pokedex_unit_port = if settings.unit.announce_port {
+        Some(settings.api.port as i32)
+    } else {
+        None
     };
 
-    let pokedex_unit = diesel::insert_into(ServiceUnits::table)
-        .values(&NewServiceUnit {
-            id: &uuid::Uuid::new_v4().to_string(),
-            service_id: service_query.id,
-            address: Some(
-                config
-                    .get_string("unit.address")
-                    .expect("Pokedex must have a unit address set!"),
-            ),
-            port: pokedex_unit_port,
-        })
-        .returning(ServiceUnit::as_returning())
-        .get_result(&mut pg_conn)
-        .expect("Failed to register unit with database!");
-    let pokedex_unit_uuid = Arc::new(Uuid::from_str(&pokedex_unit.id).unwrap());
+    if let Err(error) = sqlx::query(
+        r#"
+		INSERT INTO "ServiceUnits"
+		VALUES ($1, $2, $3, $4)
+		"#,
+    )
+    .bind(*unit_uuid)
+    .bind(&*settings.unit.username)
+    .bind(&*settings.unit.address)
+    .bind(pokedex_unit_port)
+    .execute(&mut *db_pool.acquire().await.unwrap())
+    .await
+    {
+        panic!("Failed to register the unit with the database! ({})", error);
+    }
+
     info!("Successfully registered unit with database!");
 
     // Tokio setup
@@ -93,8 +89,10 @@ async fn main() {
     let task_token = CancellationToken::new();
 
     // Gracefule shutdown with cleanup
+    let signal_task_db_pool = db_pool.clone();
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
+    let signal_task_unit_uuid = unit_uuid.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
@@ -102,9 +100,12 @@ async fn main() {
                 match result {
                     Ok(_) => {
                         // Deregister pokedex with database
-                        diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(pokedex_unit.id)))
-                            .execute(&mut pg_conn)
-                            .unwrap();
+                        sqlx::query(
+                            r#"
+							DELETE FROM "ServiceUnits"
+							WHERE id = $1
+							"#
+                        ).bind(*signal_task_unit_uuid).execute(&mut *signal_task_db_pool.acquire().await.unwrap()).await.unwrap();
                         info!("Successfully deregistered unit with database!");
 
                         // Cancel all tasks
@@ -118,11 +119,13 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Deregister pokedex with database
-                diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(pokedex_unit.id)))
-                    .execute(&mut pg_conn)
-                    .unwrap();
+                sqlx::query(
+                    r#"
+					DELETE FROM "ServiceUnits"
+					WHERE id = $1
+					"#
+                ).bind(*signal_task_unit_uuid).execute(&mut *signal_task_db_pool.acquire().await.unwrap()).await.unwrap();
                 info!("Successfully deregistered unit with database!");
-
 
                 // Cancel all tasks
                 signal_task_tracker.close();
@@ -132,11 +135,10 @@ async fn main() {
     });
 
     // Axum API
-    let axum_config = config.clone();
-    let axum_jwt_keys = jwt_keys.clone();
+    let axum_db_pool = db_pool.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(axum_config, axum_jwt_keys, pokedex_unit_uuid) => {
+            () = api::run(Arc::new(config), jwt_keys, unit_uuid, axum_db_pool) => {
                 info!("Axum API task exited on its own!");
             }
             () = task_token.cancelled() => {
@@ -146,4 +148,5 @@ async fn main() {
     });
 
     task_tracker.wait().await;
+    db_pool.close().await;
 }

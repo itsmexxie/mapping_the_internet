@@ -1,15 +1,18 @@
 [api]
-# port =		# Specifies the port on which the API will listen
+# port =			# Specifies the port on which the API will listen
+# auth =			# Whether to hide the API behind an auth middleware.
 
 [database]
-# hostname = 		# The host used when connecting to the database
-# username = 	# The username used when connecting to the database
-# password = 	# The password used when connecting to the database
-# database = 	# The target database used when connecting to the database
+# hostname = 		# The host used when connecting to the database.
+# username = 		# The username used when connecting to the database.
+# password = 		# The password used when connecting to the database.
+# database = 		# The target database used when connecting to the database.
 
 [pokedex]
-# address =		# The address used when connecting to a Pokedex instance
+# address =			# The address used when connecting to a Pokedex instance.
 
 [unit]
-# username =	# The username of the unit, used when logging into Pokedex
-# password =	# The password of the unit, used when logging into Pokedex
+# username =		# The username of the unid, used when logging into Pokedex.
+# password =		# The password of the unit, used when logging into Pokedex.
+# address =			# The address of the unit, used when logging into Pokedex. Optional.
+# announce_port =	# Whether to announce the api.port to Pokedex database. Defaults to false.

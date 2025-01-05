@@ -30,7 +30,7 @@ impl PokedexConfig {
         config
     }
 
-    #[cfg(feature = "config")]
+    #[cfg(feature = "settings")]
     pub fn from_config(config: &config::Config) -> Self {
         let unit_username = config
             .get_string("unit.username")

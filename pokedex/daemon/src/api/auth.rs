@@ -1,18 +1,18 @@
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    Extension, Json,
+    routing::post,
+    Extension, Json, Router,
 };
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use jsonwebtoken::{Algorithm, EncodingKey, TokenData};
 use mtilib::auth::JWTClaims;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::error;
 use uuid::Uuid;
 
 use super::AppState;
-use crate::models::{NewServiceUnit, Service, ServiceUnit};
-use crate::schema::{ServiceUnits, Services};
+use mtilib::db::models::Service;
 
 #[derive(Debug, Deserialize)]
 pub struct LoginBody {
@@ -28,27 +28,43 @@ pub struct LoginResponse {
     pub uuid: Uuid,
 }
 
-pub async fn login_index(
+pub async fn login(
     Query(login_body): Query<LoginBody>,
     State(state): State<AppState>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    let pg_conn = &mut crate::db::create_conn(&state.config);
+    let service = match sqlx::query_as::<_, Service>(
+        r#"
+		SELECT *
+		FROM "Services"
+		WHERE id = $1
+		"#,
+    )
+    .bind(login_body.username.clone())
+    .fetch_one(&mut *state.db_pool.acquire().await.unwrap())
+    .await
+    {
+        Ok(service) => service,
+        Err(error) => match error {
+            sqlx::Error::RowNotFound => return Err(StatusCode::BAD_REQUEST),
+            _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        },
+    };
 
-    let service_query = Services::table
-        .select(Service::as_select())
-        .filter(Services::name.eq(&login_body.username))
-        .first(pg_conn)
-        .unwrap();
+    if bcrypt::verify(&login_body.password, &service.password).unwrap() {
+        if service.max_one {
+            let service_units: i64 = sqlx::query_scalar(
+                r#"
+				SELECT COUNT(*)
+				FROM "ServiceUnits"
+				WHERE service_id = $1
+				"#,
+            )
+            .bind(service.id.clone())
+            .fetch_one(&mut *state.db_pool.acquire().await.unwrap())
+            .await
+            .unwrap();
 
-    if bcrypt::verify(&login_body.password, &service_query.password).unwrap() {
-        if service_query.max_one {
-            let service_units_query = ServiceUnits::table
-                .select(ServiceUnit::as_select())
-                .filter(ServiceUnits::service_id.eq(service_query.id))
-                .load(pg_conn)
-                .unwrap();
-
-            if !service_units_query.is_empty() {
+            if service_units > 0 {
                 return Err(StatusCode::FORBIDDEN);
             }
         }
@@ -57,7 +73,7 @@ pub async fn login_index(
         let system_time = SystemTime::now();
 
         let token_claims = JWTClaims {
-            id: new_unit_uuid.to_string(),
+            id: new_unit_uuid,
             srv: login_body.username.clone(),
             exp: system_time.duration_since(UNIX_EPOCH).unwrap().as_secs()
                 + state
@@ -72,35 +88,58 @@ pub async fn login_index(
         )
         .unwrap();
 
-        let new_service_unit = NewServiceUnit {
-            id: &new_unit_uuid.to_string(),
-            service_id: service_query.id, // service id as queried from the database
-            address: login_body.address,
-            port: login_body.port,
-        };
-        diesel::insert_into(ServiceUnits::table)
-            .values(&new_service_unit)
-            .returning(ServiceUnit::as_returning())
-            .get_result(pg_conn)
-            .unwrap();
-
-        Ok(Json(LoginResponse {
-            token: token.to_string(),
-            uuid: new_unit_uuid,
-        }))
+        match sqlx::query(
+            r#"
+			INSERT INTO "ServiceUnits"
+			VALUES ($1, $2, $3, $4)
+			"#,
+        )
+        .bind(new_unit_uuid)
+        .bind(service.id)
+        .bind(login_body.address)
+        .bind(login_body.port)
+        .execute(&mut *state.db_pool.acquire().await.unwrap())
+        .await
+        {
+            Ok(_) => Ok(Json(LoginResponse {
+                token: token.to_string(),
+                uuid: new_unit_uuid,
+            })),
+            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        }
     } else {
         Err(StatusCode::UNAUTHORIZED)
     }
 }
 
-pub async fn logout_index(
+pub async fn logout(
     Extension(jwt): Extension<TokenData<JWTClaims>>,
     State(state): State<AppState>,
 ) -> StatusCode {
-    let pg_conn = &mut crate::db::create_conn(&state.config);
-    diesel::delete(ServiceUnits::table.filter(ServiceUnits::id.eq(jwt.claims.id)))
-        .execute(pg_conn)
-        .unwrap();
+    match sqlx::query(
+        r#"
+		DELETE FROM "ServiceUnits"
+		WHERE id = $1
+		"#,
+    )
+    .bind(jwt.claims.id)
+    .execute(&mut *state.db_pool.acquire().await.unwrap())
+    .await
+    {
+        Ok(_) => StatusCode::OK,
+        Err(error) => {
+            error!("Error while logging out a unit: {}", error);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
 
-    StatusCode::OK
+pub fn router(state: AppState) -> Router<AppState> {
+    Router::new().route("/login", post(login)).route(
+        "/logout",
+        post(logout).layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            mtilib::auth::axum_middleware::<AppState>,
+        )),
+    )
 }

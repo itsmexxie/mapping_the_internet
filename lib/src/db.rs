@@ -7,6 +7,8 @@ use sqlx::{Pool, Postgres};
 use std::sync::Arc;
 use urlencoding;
 
+pub mod models;
+
 #[cfg(feature = "sqlx")]
 pub type DbPool = Arc<Pool<Postgres>>;
 
