@@ -2,7 +2,6 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{http::StatusCode, Json, Router};
-use concat_string::concat_string;
 use config::Config;
 use mtilib::auth::{GetJWTKeys, JWTKeys};
 use mtilib::db::DbPool;
@@ -14,6 +13,7 @@ use tracing::info;
 use uuid::Uuid;
 
 pub mod v1;
+pub mod v2;
 
 #[derive(Serialize)]
 struct UnitResponse {
@@ -31,7 +31,7 @@ async fn health() -> impl IntoResponse {
 }
 
 async fn index() -> impl IntoResponse {
-    concat_string!("Pokedex API, v", env!("CARGO_PKG_VERSION"))
+    format!("Pokedex API, v{}", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(Clone)]
@@ -63,6 +63,7 @@ pub async fn run(
 
     let app = Router::new()
         .nest("/v1", v1::router(state.clone()))
+        .nest("/v2", v2::router())
         .route("/_unit", get(unit))
         .route("/_health", get(health))
         .route("/", get(index))
