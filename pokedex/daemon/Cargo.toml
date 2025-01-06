@@ -1,17 +1,17 @@
 [package]
 name = "pokedex-daemon"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 
 [dependencies]
 axum = { version = "0.8.1", features = ["ws"] }
 bcrypt = "0.16.0"
-chrono = { version = "0.4.38", features = ["serde"] }
+chrono = { version = "0.4.39", features = ["serde"] }
 config = { version = "0.15.4", default-features = false, features = ["toml"] }
 futures = "0.3.31"
 futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
 jsonwebtoken = "9.3.0"
-mtilib = { path = "../../lib", features = ["axum", "serde", "settings", "sqlx", "pokedex-v2"] }
+mtilib = { path = "../../lib", features = ["axum", "pokedex", "serde", "settings", "sqlx"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 sqlx = { version = "0.8.3", features = ["postgres", "uuid", "chrono", "runtime-tokio", "tls-rustls"] }
