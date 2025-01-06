@@ -6,8 +6,13 @@ use serde::Deserialize;
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct SettingsAPI {
     pub port: u16,
-    #[cfg_attr(feature = "serde", serde(default = "default_api_auth"))]
+    #[cfg_attr(feature = "serde", serde(default = "_default_api_auth"))]
     pub auth: bool,
+}
+
+#[cfg(feature = "serde")]
+const fn _default_api_auth() -> bool {
+    true
 }
 
 #[derive(Debug)]
@@ -33,11 +38,6 @@ pub struct SettingsUnit {
     pub address: Option<String>,
     #[cfg_attr(feature = "serde", serde(default))]
     pub announce_port: bool,
-}
-
-#[cfg(feature = "serde")]
-fn default_api_auth() -> bool {
-    true
 }
 
 #[cfg(feature = "serde")]

@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7.7"
+axum = "0.8.1"
 concat-string = "1.0.1"
-config = "0.15.4"
+config = { version = "0.15.4", default-features = false, features = ["toml"] }
 futures = "0.3.31"
 jsonwebtoken = "9.3.0"
-mtilib = { path = "../lib", features = ["axum", "config"] }
+mtilib = { path = "../lib", features = ["axum", "pokedex", "serde", "settings"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json"] }
 rustls = { version = "0.23.19", features = ["ring"] }
@@ -17,11 +17,11 @@ serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 surge-ping = "0.8.1"
 tokio = { version = "1.41.1", features = ["full"] }
-tokio-tungstenite = { version = "0.24.0", features = ["url", "rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.26.1", features = ["url", "rustls-tls-native-roots"] }
 tokio-util = { version = "0.7.12", features = ["rt"] }
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 url = "2.5.4"
-uuid = { version = "1.11.0", features = ["v4"] }
+uuid = { version = "1.11.0", default-features = false, features = ["v4"] }

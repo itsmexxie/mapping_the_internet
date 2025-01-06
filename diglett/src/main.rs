@@ -24,15 +24,20 @@ pub mod utils;
 extern crate concat_string;
 
 /*
- * 0. Sprite
- * 1. Tracing
- * 2. Settings
- * 3. Load JWT keys
- * 3. Login to Pokedex
- * 4. Tokio setup
- * 5. Graceful shutdown task
- * 6. Load providers
- * 7. Axum API task
+ * == STATIC ==
+ * 1. Sprite
+ * 2. Rustls
+ * 3. Tracing
+ * 4. Settings
+ * 5. Load JWT keys
+ * == POKEDEX ==
+ * 6. Login to Pokedex
+ * == TOKIO ==
+ * 7. Tokio setup
+ * 8. Graceful shutdown task
+ * == RUNTIME ==
+ * 9. Load providers
+ * 10. Axum API task
  */
 #[tokio::main]
 async fn main() {
@@ -44,6 +49,11 @@ async fn main() {
     io::copy(&mut reader, &mut io::stdout())
         .await
         .expect("Failed to copy sprite to stdout!");
+
+    // Something for WSS
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
 
     // Tracing
     tracing_subscriber::fmt::init();

@@ -6,6 +6,8 @@ use tracing::error;
 pub use url::Url;
 use uuid::Uuid;
 
+pub mod ws;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UnitMessage {
@@ -54,6 +56,9 @@ impl Pokedex {
 
     // TODO: Proper error handling
     // TODO: Expose communication with Pokedex through WS
+    // TODO: Make a separate client which handles communication with Pokedex ws
+    // Probably will spawn a task and return a wrapper around a mpsc::Sender for sending commands
+    // Not sure about receiving
     pub async fn register<S: AsRef<str>>(
         &self,
         address: S,
@@ -67,7 +72,7 @@ impl Pokedex {
         };
         register_address.set_path("/v2/ws");
 
-        let (ws_stream, _) = connect_async(register_address.as_str()).await.unwrap();
+        let (ws_stream, _) = connect_async(register_address).await.unwrap();
         let (mut ws_write, mut ws_read) = ws_stream.split();
 
         tokio::spawn(async move {
@@ -108,5 +113,9 @@ impl Pokedex {
             ))
             .await
             .unwrap();
+    }
+
+    pub fn get_token(&self) -> String {
+        self.token.clone()
     }
 }

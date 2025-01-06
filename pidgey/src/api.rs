@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use concat_string::concat_string;
 use config::Config;
 use mtilib::auth::{GetJWTKeys, JWTKeys};
 use serde::Serialize;
@@ -15,7 +16,7 @@ use crate::diglett::Diglett;
 
 #[derive(Serialize)]
 struct UnitResponse {
-    uuid: Uuid,
+    uuid: Option<Uuid>,
 }
 
 async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
@@ -35,7 +36,7 @@ async fn index() -> impl IntoResponse {
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
-    pub unit_uuid: Arc<Uuid>,
+    pub unit_uuid: Arc<Option<Uuid>>,
     pub jwt_keys: Arc<JWTKeys>,
     pub worker_permits: Arc<Semaphore>,
     pub diglett: Arc<Diglett>,
@@ -50,7 +51,7 @@ impl GetJWTKeys for AppState {
 
 pub async fn run(
     config: Arc<Config>,
-    unit_uuid: Arc<Uuid>,
+    unit_uuid: Arc<Option<Uuid>>,
     jwt_keys: Arc<JWTKeys>,
     worker_permits: Arc<Semaphore>,
     diglett: Arc<Diglett>,

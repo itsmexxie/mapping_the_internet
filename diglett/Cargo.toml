@@ -9,10 +9,11 @@ clokwerk = "0.4.0"
 concat-string = "1.0.1"
 config = "0.15.4"
 csv = "1.3.1"
-mtilib = { path = "../lib", features = ["axum", "settings", "pokedex-v2"] }
+mtilib = { path = "../lib", features = ["axum", "pokedex", "settings"] }
 priority-queue = "2.1.1"
 regex = "1.11.1"
-reqwest = "0.12.9"
+reqwest = "0.12.12"
+rustls = { version = "0.23.20", features = ["ring"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 tokio = { version = "1.41.1", features = ["full"] }

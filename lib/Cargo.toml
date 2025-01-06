@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-axum       = ["serde", "dep:axum", "dep:jsonwebtoken"]
-settings   = ["dep:config"]
-diesel     = ["dep:chrono", "dep:diesel", "dep:urlencoding"]
-pokedex-v2 = ["serde", "dep:futures", "dep:tokio-tungstenite"]
-serde      = ["dep:serde", "dep:serde_json"]
-sqlx       = ["dep:chrono", "dep:sqlx", "dep:urlencoding"]
+axum     = ["serde", "dep:axum", "dep:jsonwebtoken"]
+settings = ["dep:config"]
+diesel   = ["dep:chrono", "dep:diesel", "dep:urlencoding"]
+pokedex  = ["serde", "dep:futures", "dep:tokio-tungstenite"]
+serde    = ["dep:serde", "dep:serde_json"]
+sqlx     = ["dep:chrono", "dep:sqlx", "dep:urlencoding"]
 
 [dependencies]
 axum = { version = "0.8.1", optional = true }
@@ -23,20 +23,24 @@ jsonwebtoken = { version = "9.3.0", optional = true }
 reqwest = { version = "0.12.9", features = ["json"] }
 serde = { version = "1.0.215", features = ["derive"], optional = true }
 serde_json = { version = "1.0.133", optional = true }
-tokio = { version = "1.42.0", features = ["fs", "rt", "sync"], default-features = false }
-tokio-tungstenite = { version = "0.26.1", optional = true }
+tokio-tungstenite = { version = "0.26.1", features = ["url", "rustls-tls-native-roots"], optional = true }
 tracing = "0.1.41"
 url = "2.5.4"
 urlencoding = { version = "2.1.3", optional = true }
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
 
 [dependencies.chrono]
-version          = "*"
+version          = "0.4.39"
 default-features = false
 features         = ["serde"]
 optional         = true
 
 [dependencies.sqlx]
-version  = "0.8"
+version  = "0.8.3"
 features = ["postgres", "chrono", "ipnetwork", "runtime-tokio", "tls-rustls"]
 optional = true
+
+[dependencies.tokio]
+version          = "1.42.0"
+default_features = false
+features         = ["fs", "rt", "sync"]

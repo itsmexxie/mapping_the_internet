@@ -1,28 +1,41 @@
 use std::sync::Arc;
 
-use config::Config;
 use diglett::Diglett;
-use mtilib::{
-    auth::JWTKeys,
-    pokedex::{config::PokedexConfig, Pokedex},
-};
+use mtilib::{auth::JWTKeys, pokedex::Pokedex};
+use settings::Settings;
 use tokio::{
     signal::{self, unix::SignalKind},
-    sync::{Mutex, Semaphore},
+    sync::{oneshot, Mutex, Semaphore},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
-
-#[macro_use(concat_string)]
-extern crate concat_string;
+use url::Url;
+use uuid::Uuid;
 
 pub mod api;
 pub mod diglett;
 pub mod gust;
 pub mod pidgeotto;
+pub mod settings;
 
 pub const MAX_WORKERS: usize = 64;
 
+/*
+ * == STATIC ==
+ * 1. Sprite
+ * 2. Tracing
+ * 3. Settings
+ * 4. Load JWT keys
+ * == POKEDEX ==
+ * 5. Login to Pokedex
+ * == TOKIO ==
+ * 6. Tokio setup
+ * 7. Graceful shutdown task
+ * == RUNTIME ==
+ * 8. Create database connection pool
+ * 9. Load providers
+ * 10. Axum API task
+ */
 #[tokio::main]
 async fn main() {
     // Tracing
@@ -34,17 +47,9 @@ async fn main() {
         .expect("Failed to install rustls crypto provider");
 
     // Config
-    let config = Arc::new(
-        Config::builder()
-            .add_source(config::File::with_name("config.toml"))
-            .build()
-            .unwrap(),
-    );
-
-    let max_workers = match config.get_int("settings.max_workers") {
-        Ok(max) => max as usize,
-        Err(_) => MAX_WORKERS,
-    };
+    let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
+    let config = Arc::new(config);
+    let settings: Arc<Settings> = Arc::new(settings);
 
     // JWT keys
     let jwt_keys = Arc::new(
@@ -57,40 +62,52 @@ async fn main() {
     );
 
     // Login to Pokedex
-    let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
-        &config,
-    ))));
+    let pokedex = Arc::new(Mutex::new(
+        Pokedex::login(
+            &Url::parse(&settings.pokedex.address).expect("Failed to parse Pokedex url"),
+            &settings.unit.username,
+            &settings.unit.password,
+        )
+        .await
+        .unwrap(),
+    ));
 
-    let (jwt, unit_uuid) = match pokedex.lock().await.login().await {
-        Ok(res) => {
-            info!("Successfully logged into Pokedex!");
-            (Arc::new(res.token), Arc::new(res.uuid))
+    let unit_uuid = Arc::new(match settings.unit.address.as_ref() {
+        Some(unit_address) => {
+            let (register_tx, register_rx) = oneshot::channel::<Uuid>();
+
+            let unit_port = match settings.unit.announce_port {
+                true => Some(settings.api.port),
+                false => None,
+            };
+
+            pokedex
+                .lock()
+                .await
+                .register(unit_address, unit_port, register_tx)
+                .await;
+
+            info!("Successfully registered the unit to Pokedex!");
+            Some(register_rx.await.unwrap())
         }
-        Err(error) => {
-            error!(error);
-            panic!()
-        }
-    };
+        None => None,
+    });
 
     // Tokio setup
     let task_tracker = TaskTracker::new();
     let task_token = CancellationToken::new();
 
-    let worker_permits = Arc::new(Semaphore::new(max_workers));
+    let worker_permits = Arc::new(Semaphore::new(settings.max_workers));
 
     // Graceful shutdown with cleanup
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
-    let signal_task_pokedex = pokedex.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        signal_task_pokedex.lock().await.logout().await;
-                        info!("Successfully logged out of Pokedex!");
-
                         // Cancel all tasks
                         signal_task_tracker.close();
                         signal_task_token.cancel();
@@ -101,10 +118,6 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
-                // Logout of Pokedex
-                signal_task_pokedex.lock().await.logout().await;
-                info!("Successfully logged out of Pokedex!");
-
                 // Cancel all tasks
                 signal_task_tracker.close();
                 signal_task_token.cancel();
@@ -113,17 +126,17 @@ async fn main() {
     });
 
     // Diglett setup
-    let diglett = Arc::new(Diglett::new(&config, pokedex).await);
+    let diglett = Arc::new(Diglett::new(&config).await);
 
     // Ping client setup
     let ping_client = Arc::new(surge_ping::Client::new(&surge_ping::Config::new()).unwrap());
 
     // Axum API task
-    let axum_task_token = task_token.clone();
     let axum_config = config.clone();
     let axum_worker_permits = worker_permits.clone();
     let axum_diglett = diglett.clone();
     let axum_ping_client = ping_client.clone();
+    let axum_task_token = task_token.clone();
     task_tracker.spawn(async move {
         tokio::select! {
             () = api::run(axum_config, unit_uuid, jwt_keys, axum_worker_permits, axum_diglett, axum_ping_client) => {
@@ -138,7 +151,7 @@ async fn main() {
     // Pidgeotto connection task
     task_tracker.spawn(async move {
         tokio::select! {
-            () = pidgeotto::run(config, worker_permits, jwt, diglett, ping_client) => {
+            () = pidgeotto::run(config, worker_permits, pokedex, diglett, ping_client) => {
                 info!("Pidgeotto task exited on its own!")
             }
             () = task_token.cancelled() => {
