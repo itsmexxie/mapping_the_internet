@@ -168,7 +168,7 @@ async fn get_country(
 
 #[derive(Serialize)]
 struct UnitResponse {
-    uuid: Uuid,
+    uuid: Option<Uuid>,
 }
 
 async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
@@ -187,7 +187,7 @@ async fn index() -> impl IntoResponse {
 
 #[derive(Clone)]
 struct AppState {
-    unit_uuid: Arc<Uuid>,
+    unit_uuid: Arc<Option<Uuid>>,
     jwt_keys: Option<Arc<JWTKeys>>,
     providers: Arc<RwLock<Providers>>,
 }
@@ -200,7 +200,7 @@ impl GetJWTKeys for AppState {
 
 pub async fn run(
     settings: Arc<Settings>,
-    unit_uuid: Arc<Uuid>,
+    unit_uuid: Arc<Option<Uuid>>,
     jwt_keys: Option<Arc<JWTKeys>>,
     providers: Arc<RwLock<Providers>>,
 ) {
@@ -227,7 +227,7 @@ pub async fn run(
         .route("/", get(index))
         .route("/_unit", get(unit))
         .route("/_health", get(health))
-        .nest("/:address", address_router)
+        .nest("/{address}", address_router)
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 

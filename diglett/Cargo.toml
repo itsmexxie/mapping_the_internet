@@ -4,12 +4,12 @@ version = "1.2.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7.7"
+axum = "0.8.1"
 clokwerk = "0.4.0"
 concat-string = "1.0.1"
 config = "0.15.4"
 csv = "1.3.1"
-mtilib = { path = "../lib", features = ["axum", "config"] }
+mtilib = { path = "../lib", features = ["axum", "settings", "pokedex-v2"] }
 priority-queue = "2.1.1"
 regex = "1.11.1"
 reqwest = "0.12.9"

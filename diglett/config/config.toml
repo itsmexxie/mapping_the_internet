@@ -51,7 +51,7 @@
 # max_time =	# The time after which the downloaded file is considered "stale".
 
 [unit]
-# username =	# The username of the unit, used when logging into Pokedex.
-# password =	# The password of the unit, used when logging into Pokedex.
-# address =		# The address on which the unit is reachable, used when logging into Pokedex. (Optional.)
-# port =		# The port on which the units is reachable, used when logging into Pokedex. (Optional, only specify when the unit is not reachable on port 80 or 443.)
+# username =		# The username of the unid, used when logging into Pokedex.
+# password =		# The password of the unit, used when logging into Pokedex.
+# address =			# The address of the unit, used when logging into Pokedex. Optional.
+# announce_port =	# Whether to announce the api.port to Pokedex database. Only specify when the unit is not reachable on port 80 or 443. Defaults to false.

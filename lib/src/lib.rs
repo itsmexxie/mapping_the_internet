@@ -3,9 +3,9 @@ pub mod auth;
 pub mod db;
 pub mod pidgey;
 #[cfg(all(not(feature = "pokedex-v2"), feature = "serde"))]
-pub mod pokedex_v1;
+mod pokedex_v1;
 #[cfg(feature = "pokedex-v2")]
-pub mod pokedex_v2;
+mod pokedex_v2;
 pub mod pokedex {
     #[cfg(all(not(feature = "pokedex-v2"), feature = "serde"))]
     pub use crate::pokedex_v1::*;

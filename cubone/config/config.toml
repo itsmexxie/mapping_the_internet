@@ -15,4 +15,4 @@
 # username =		# The username of the unid, used when logging into Pokedex.
 # password =		# The password of the unit, used when logging into Pokedex.
 # address =			# The address of the unit, used when logging into Pokedex. Optional.
-# announce_port =	# Whether to announce the api.port to Pokedex database. Defaults to false.
+# announce_port =	# Whether to announce the api.port to Pokedex database. Only specify when the unit is not reachable on port 80 or 443. Defaults to false.

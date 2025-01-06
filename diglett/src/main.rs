@@ -1,6 +1,6 @@
 use mtilib::{
     auth::JWTKeys,
-    pokedex::{config::PokedexConfig, Pokedex},
+    pokedex::{Pokedex, Url},
 };
 use providers::Providers;
 use settings::Settings;
@@ -9,10 +9,11 @@ use tokio::{
     fs::File,
     io,
     signal::{self, unix::SignalKind},
-    sync::{Mutex, RwLock},
+    sync::{oneshot, Mutex, RwLock},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub mod api;
 pub mod providers;
@@ -48,8 +49,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Settings
-    let (config, settings) = Settings::load();
-    let settings = Arc::new(settings);
+    let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
+    let settings: Arc<Settings> = Arc::new(settings);
 
     // Load JWT keys if api.auth is set to true
     let mut jwt_keys = None;
@@ -65,20 +66,36 @@ async fn main() {
     }
 
     // Login to Pokedex
-    let pokedex = Arc::new(Mutex::new(Pokedex::new(PokedexConfig::from_config(
-        &config,
-    ))));
+    let pokedex = Arc::new(Mutex::new(
+        Pokedex::login(
+            &Url::parse(&settings.pokedex.address).expect("Failed to parse Pokedex url"),
+            &settings.unit.username,
+            &settings.unit.password,
+        )
+        .await
+        .unwrap(),
+    ));
 
-    let unit_uuid = match pokedex.lock().await.login().await {
-        Ok(login_res) => {
-            info!("Successfully logged into Pokedex!");
-            Arc::new(login_res.uuid)
+    let unit_uuid = Arc::new(match settings.unit.address.as_ref() {
+        Some(unit_address) => {
+            let (register_tx, register_rx) = oneshot::channel::<Uuid>();
+
+            let unit_port = match settings.unit.announce_port {
+                true => Some(settings.api.port),
+                false => None,
+            };
+
+            pokedex
+                .lock()
+                .await
+                .register(unit_address, unit_port, register_tx)
+                .await;
+
+            info!("Successfully registered the unit to Pokedex!");
+            Some(register_rx.await.unwrap())
         }
-        Err(error) => {
-            error!(error);
-            panic!()
-        }
-    };
+        None => None,
+    });
 
     // Tokio setup
     let task_tracker = TaskTracker::new();
@@ -93,7 +110,6 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        pokedex.lock().await.logout().await;
                         info!("Successfully logged out of Pokedex!");
 
                         // Cancel all tasks
@@ -107,7 +123,6 @@ async fn main() {
             }
             _ = sigterm.recv() => {
                 // Logout of Pokedex
-                pokedex.lock().await.logout().await;
                 info!("Successfully logged out of Pokedex!");
 
                 // Cancel all tasks

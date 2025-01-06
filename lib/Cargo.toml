@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-axum       = ["dep:axum", "dep:jsonwebtoken"]
+axum       = ["serde", "dep:axum", "dep:jsonwebtoken"]
 settings   = ["dep:config"]
 diesel     = ["dep:chrono", "dep:diesel", "dep:urlencoding"]
-pokedex-v2 = ["dep:futures", "dep:serde", "dep:serde_json", "dep:tokio-tungstenite"]
+pokedex-v2 = ["serde", "dep:futures", "dep:tokio-tungstenite"]
 serde      = ["dep:serde", "dep:serde_json"]
 sqlx       = ["dep:chrono", "dep:sqlx", "dep:urlencoding"]
 
