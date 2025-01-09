@@ -96,12 +96,10 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        // signal_task_pokedex.lock().await.logout().await;
-                        info!("Successfully logged out of Pokedex!");
-
                         // Cancel all tasks
                         signal_task_tracker.close();
                         signal_task_token.cancel();
+                        println!("shutting down");
                     }
                     Err(err) => {
                         error!("Unable to listen for shutdown signal: {}", err);
@@ -109,10 +107,6 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
-                // Logout of Pokedex
-                // signal_task_pokedex.lock().await.logout().await;
-                info!("Successfully logged out of Pokedex!");
-
                 // Cancel all tasks
                 signal_task_tracker.close();
                 signal_task_token.cancel();

@@ -4,6 +4,7 @@
 		"settings",
 		"diesel",
         "pokedex",
+        "rustls",
 		"serde",
 		"sqlx"
 	]

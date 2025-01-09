@@ -50,11 +50,6 @@ async fn main() {
         .await
         .expect("Failed to copy sprite to stdout!");
 
-    // Something for WSS
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
-
     // Tracing
     tracing_subscriber::fmt::init();
 

@@ -2,6 +2,7 @@ use core::panic;
 
 use concat_string::concat_string;
 use futures::{SinkExt, StreamExt};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio_tungstenite::connect_async;
@@ -72,6 +73,11 @@ impl Pokedex {
         port: Option<u16>,
         callback: oneshot::Sender<Uuid>,
     ) {
+        #[cfg(feature = "rustls")]
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+
         let mut register_address = self.address.clone();
         match register_address.scheme() {
             "https" => register_address.set_scheme("wss").unwrap(),
@@ -137,9 +143,9 @@ impl Pokedex {
             .send()
             .await
         {
-            Ok(res) => match res.json::<Vec<types::Service>>().await {
-                Ok(services) => services,
-                Err(error) => panic!("Error while getting Pokedex services! ({})", error),
+            Ok(res) => match res.status() {
+                StatusCode::OK => res.json().await.unwrap(),
+                status => panic!("Error while getting Pokedex services! (status: {})", status),
             },
             Err(error) => panic!("Error while getting Pokedex services! ({})", error),
         }
@@ -155,9 +161,9 @@ impl Pokedex {
             .send()
             .await
         {
-            Ok(res) => match res.json::<types::Service>().await {
-                Ok(service) => service,
-                Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+            Ok(res) => match res.status() {
+                StatusCode::OK => res.json().await.unwrap(),
+                status => panic!("Error while getting Pokedex services! (status: {})", status),
             },
             Err(error) => panic!("Error while getting Pokedex service! ({})", error),
         }
@@ -173,9 +179,9 @@ impl Pokedex {
             .send()
             .await
         {
-            Ok(res) => match res.json::<Vec<ServiceUnit>>().await {
-                Ok(service_units) => service_units,
-                Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+            Ok(res) => match res.status() {
+                StatusCode::OK => res.json().await.unwrap(),
+                status => panic!("Error while getting Pokedex services! (status: {})", status),
             },
             Err(error) => panic!("Error while getting Pokedex service! ({})", error),
         }

@@ -1,7 +1,7 @@
 [package]
 name = "cubone"
 edition = "2021"
-version = "0.1.0"
+version = "1.0.0"
 
 [dependencies]
 axum = "0.8.1"
@@ -9,7 +9,7 @@ chrono = { version = "0.4.39", default-features = false, features = ["serde"] }
 concat-string = "1.0.1"
 config = { version = "0.15.4", default-features = false, features = ["toml"] }
 ipnetwork = { version = "0.20.0", features = ["serde"] }
-mtilib = { path = "../lib", features = ["pokedex", "serde", "settings", "sqlx"] }
+mtilib = { path = "../lib", features = ["pokedex", "rustls", "serde", "settings", "sqlx"] }
 serde = { version = "1.0.215", features = ["derive"] }
 sqlx = { version = "0.8.3", features = ["postgres", "chrono", "ipnetwork", "runtime-tokio", "tls-rustls"] }
 tokio = { version = "1.41.1", features = ["full"] }
