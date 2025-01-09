@@ -121,6 +121,10 @@ pub async fn map_one(
     Path((address, prefix_length)): Path<(String, u8)>,
     State(state): State<AppState>,
 ) -> Result<String, StatusCode> {
+    if ![8, 16, 24, 32].contains(&prefix_length) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let target_network = match Ipv4Network::new(
         match Ipv4Addr::from_str(&address) {
             Ok(addr) => addr,
@@ -131,6 +135,26 @@ pub async fn map_one(
         Ok(network) => network,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
+
+    if target_network.prefix() == 32 {
+        return match sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT allocation_state_id
+            FROM "Addresses"
+            WHERE id = $1
+            "#,
+        )
+        .bind(IpNetwork::V4(target_network))
+        .fetch_one(&mut *state.db_pool.acquire().await.unwrap())
+        .await
+        {
+            Ok(alloc_state) => Ok(alloc_state),
+            Err(error) => match error {
+                sqlx::Error::RowNotFound => Ok(AllocationState::Unknown.id().to_string()),
+                _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+            },
+        };
+    }
 
     match get_network_average(target_network, state.db_pool.clone()).await {
         Ok(average) => Ok(average.id().to_string()),
