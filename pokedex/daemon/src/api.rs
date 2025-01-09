@@ -1,6 +1,6 @@
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{any, get};
 use axum::{http::StatusCode, Json, Router};
 use config::Config;
 use mtilib::auth::{GetJWTKeys, JWTKeys};
@@ -12,7 +12,6 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 use uuid::Uuid;
 
-pub mod v1;
 pub mod v2;
 
 #[derive(Serialize)]
@@ -32,6 +31,10 @@ async fn health() -> impl IntoResponse {
 
 async fn index() -> impl IntoResponse {
     format!("Pokedex API, v{}", env!("CARGO_PKG_VERSION"))
+}
+
+async fn deprecated() -> impl IntoResponse {
+    StatusCode::GONE
 }
 
 #[derive(Clone)]
@@ -62,8 +65,8 @@ pub async fn run(
     };
 
     let app = Router::new()
-        .nest("/v1", v1::router(state.clone()))
-        .nest("/v2", v2::router())
+        .nest("/v2", v2::router(state.clone()))
+        .route("/v1", any(deprecated))
         .route("/_unit", get(unit))
         .route("/_health", get(health))
         .route("/", get(index))

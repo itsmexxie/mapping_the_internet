@@ -6,7 +6,7 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use mtilib::{
-    auth::JWTClaimsv2,
+    auth::JWTClaims,
     pokedex::{PokedexMessage, UnitMessage},
 };
 use tracing::info;
@@ -46,7 +46,7 @@ async fn unit_handler(socket: WebSocket, state: AppState) {
                                 continue;
                             }
 
-                            match jsonwebtoken::decode::<JWTClaimsv2>(
+                            match jsonwebtoken::decode::<JWTClaims>(
                                 &token,
                                 &jsonwebtoken::DecodingKey::from_rsa_pem(&state.jwt_keys.public)
                                     .unwrap(),

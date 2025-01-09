@@ -1,5 +1,5 @@
 pub mod auth;
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[cfg(any(feature = "sqlx"))]
 pub mod db;
 pub mod pidgey;
 #[cfg(feature = "pokedex")]

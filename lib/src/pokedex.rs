@@ -1,11 +1,18 @@
+use core::panic;
+
+use concat_string::concat_string;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio_tungstenite::connect_async;
 use tracing::error;
+use types::Service;
 pub use url::Url;
 use uuid::Uuid;
 
+use crate::db::models::ServiceUnit;
+
+pub mod types;
 pub mod ws;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,5 +124,60 @@ impl Pokedex {
 
     pub fn get_token(&self) -> String {
         self.token.clone()
+    }
+
+    // TODO: Proper error handling
+    pub async fn get_services(&self) -> Vec<Service> {
+        let mut services_url = self.address.clone();
+        services_url.set_path("/v2/services");
+
+        match reqwest::Client::new()
+            .get(services_url)
+            .bearer_auth(self.token.clone())
+            .send()
+            .await
+        {
+            Ok(res) => match res.json::<Vec<types::Service>>().await {
+                Ok(services) => services,
+                Err(error) => panic!("Error while getting Pokedex services! ({})", error),
+            },
+            Err(error) => panic!("Error while getting Pokedex services! ({})", error),
+        }
+    }
+
+    pub async fn get_service(&self, service_id: String) -> Service {
+        let mut service_url = self.address.clone();
+        service_url.set_path(&concat_string!("/v2/service/", service_id));
+
+        match reqwest::Client::new()
+            .get(service_url)
+            .bearer_auth(self.token.clone())
+            .send()
+            .await
+        {
+            Ok(res) => match res.json::<types::Service>().await {
+                Ok(service) => service,
+                Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+            },
+            Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+        }
+    }
+
+    pub async fn get_service_units(&self, service_id: String) -> Vec<ServiceUnit> {
+        let mut service_units_url = self.address.clone();
+        service_units_url.set_path(&concat_string!("/v2/service/", service_id, "/units"));
+
+        match reqwest::Client::new()
+            .get(service_units_url)
+            .bearer_auth(self.token.clone())
+            .send()
+            .await
+        {
+            Ok(res) => match res.json::<Vec<ServiceUnit>>().await {
+                Ok(service_units) => service_units,
+                Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+            },
+            Err(error) => panic!("Error while getting Pokedex service! ({})", error),
+        }
     }
 }

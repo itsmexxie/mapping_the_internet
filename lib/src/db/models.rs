@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
 #[cfg(feature = "serde")]
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::FromRow)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Service {
     pub id: String,
     pub password: String,
@@ -12,7 +12,7 @@ pub struct Service {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ServiceUnit {
     pub id: Uuid,
     pub service_id: String,

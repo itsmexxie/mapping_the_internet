@@ -1,0 +1,23 @@
+[api]
+# port =			# Specifies the port on which the API will listen
+# auth = false      # Whether to hide the API behind an auth middleware. Defaults to false.
+
+[diglett]
+# address =         # The address to use when connecting to a diglett instance. The unit tries to connect to this one before trying to lookup available units via Pokedex. Optional.
+
+[pidgeotto]
+# connect = true    # Whether to intiate a connection to a pidgeotto instance. Defaults to true.
+# address =         # The address to use when connecting to a pidgeotto instance. The unit tries to connect to this one before trying to lookup available units via Pokedex. Optional.
+# port =            # The port to use when connecting to a pidgeotto instance. Optional.
+
+[pokedex]
+# address =			# The address used when connecting to a Pokedex instance.
+
+[settings]
+# max_workers = 64  # Maximum number of addresses that will be scanned in parallel. Defaults to 64.
+
+[unit]
+# username =		# The username of the unid, used when logging into Pokedex.
+# password =		# The password of the unit, used when logging into Pokedex.
+# address =			# The address of the unit, used when logging into Pokedex. Optional.
+# announce_port =	# Whether to announce the api.port to Pokedex database. Only specify when the unit is not reachable on port 80 or 443. Defaults to false.

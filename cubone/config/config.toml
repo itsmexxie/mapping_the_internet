@@ -1,9 +1,9 @@
 [api]
 # port =			# Specifies the port on which the API will listen
-# auth =			# Whether to hide the API behind an auth middleware.
+# auth = false      # Whether to hide the API behind an auth middleware. Defauls to false
 
 [database]
-# hostname = 		# The host used when connecting to the database.
+# hostname = 		# The hostname used when connecting to the database.
 # username = 		# The username used when connecting to the database.
 # password = 		# The password used when connecting to the database.
 # database = 		# The target database used when connecting to the database.

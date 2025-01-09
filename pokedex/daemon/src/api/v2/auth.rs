@@ -7,7 +7,7 @@ use axum::{
     routing::post,
     Router,
 };
-use mtilib::{auth::JWTClaimsv2, db::models::Service};
+use mtilib::{auth::JWTClaims, db::models::Service};
 use serde::Deserialize;
 
 use crate::api::AppState;
@@ -43,7 +43,7 @@ pub async fn login(
     if bcrypt::verify(&query.password, &service.password).unwrap() {
         let system_time = SystemTime::now();
 
-        let token_claims = JWTClaimsv2 {
+        let token_claims = JWTClaims {
             sub: service.id.clone(),
             exp: system_time.duration_since(UNIX_EPOCH).unwrap().as_secs()
                 + state.config.get_int("api.jwt.expiration").unwrap_or(3600) as u64,

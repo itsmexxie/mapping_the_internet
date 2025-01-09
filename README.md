@@ -51,4 +51,4 @@ An IPv4 address can be in one of the following allocation states:
 - [ ] (Diglett) Finish the transition to Settings
 - [ ] (Pokedex) Update example config and .gitignore
 - [ ] (Pidgeotto) Update example config and .gitignore
-- [ ] (Pidgey) Update example config and .gitignore
+- [x] (Pidgey) Update example config and .gitignore
