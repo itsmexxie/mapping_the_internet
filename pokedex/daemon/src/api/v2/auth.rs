@@ -9,6 +9,7 @@ use axum::{
 };
 use mtilib::{auth::JWTClaims, db::models::Service};
 use serde::Deserialize;
+use tracing::error;
 
 use crate::api::AppState;
 
@@ -36,7 +37,13 @@ pub async fn login(
         Ok(service) => service,
         Err(error) => match error {
             sqlx::Error::RowNotFound => return Err(StatusCode::BAD_REQUEST),
-            _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            _ => {
+                error!(
+                    "Unknown error while getting service from database! ({})",
+                    error
+                );
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
         },
     };
 

@@ -8,7 +8,6 @@ use uuid::Uuid;
 pub struct Service {
     pub id: String,
     pub password: String,
-    pub max_one: bool,
 }
 
 #[derive(Debug, sqlx::FromRow)]

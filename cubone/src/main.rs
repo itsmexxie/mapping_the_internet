@@ -61,6 +61,7 @@ async fn main() {
         .await
         .unwrap(),
     ));
+    info!("Successfully logged into Pokedex!");
 
     let unit_uuid = Arc::new(match settings.unit.address.as_ref() {
         Some(unit_address) => {
