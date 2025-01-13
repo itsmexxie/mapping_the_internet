@@ -10,6 +10,27 @@ use uuid::Uuid;
 pub mod api;
 pub mod settings;
 
+async fn shutdown(
+    db_pool: mtilib::db::DbPool,
+    task_tracker: TaskTracker,
+    task_token: CancellationToken,
+) {
+    // Deregister all units from database
+    sqlx::query(
+        r#"
+            DELETE FROM "ServiceUnits"
+            "#,
+    )
+    .execute(&mut *db_pool.acquire().await.unwrap())
+    .await
+    .unwrap();
+    info!("Successfully deregistered all units from the database!");
+
+    // Cancel all tasks
+    task_tracker.close();
+    task_token.cancel();
+}
+
 /*
  * == STATIC ==
  * 1. Tracing
@@ -92,25 +113,13 @@ async fn main() {
     let signal_task_db_pool = db_pool.clone();
     let signal_task_tracker = task_tracker.clone();
     let signal_task_token = task_token.clone();
-    let signal_task_unit_uuid = unit_uuid.clone();
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        // Deregister pokedex with database
-                        sqlx::query(
-                            r#"
-							DELETE FROM "ServiceUnits"
-							WHERE id = $1
-							"#
-                        ).bind(*signal_task_unit_uuid).execute(&mut *signal_task_db_pool.acquire().await.unwrap()).await.unwrap();
-                        info!("Successfully deregistered unit with database!");
-
-                        // Cancel all tasks
-                        signal_task_tracker.close();
-                        signal_task_token.cancel();
+                        shutdown(signal_task_db_pool, signal_task_tracker, signal_task_token).await;
                     }
                     Err(err) => {
                         error!("Unable to listen for shutdown signal: {}", err);
@@ -118,18 +127,7 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
-                // Deregister pokedex with database
-                sqlx::query(
-                    r#"
-					DELETE FROM "ServiceUnits"
-					WHERE id = $1
-					"#
-                ).bind(*signal_task_unit_uuid).execute(&mut *signal_task_db_pool.acquire().await.unwrap()).await.unwrap();
-                info!("Successfully deregistered unit with database!");
-
-                // Cancel all tasks
-                signal_task_tracker.close();
-                signal_task_token.cancel();
+                shutdown(signal_task_db_pool, signal_task_tracker, signal_task_token).await;
             }
         }
     });

@@ -157,6 +157,13 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@mhyfritz/bin-data@0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@mhyfritz/bin-data/-/bin-data-0.0.3.tgz#45e99b39691f802272c96c59773801f039cd6a5b"
+  integrity sha512-HV1cSxACr+F9fu8hx/B6AArDWywV84gqJCGl3zwdjujxzATg40QZ/OSbHih9h+kM168+adD7SQAoaGRZHh7cQQ==
+  dependencies:
+    d3-array "^2.3.1"
+
 "@parcel/watcher-android-arm64@2.5.0":
   version "2.5.0"
   resolved "https://registry.yarnpkg.com/@parcel/watcher-android-arm64/-/watcher-android-arm64-2.5.0.tgz#e32d3dda6647791ee930556aee206fcd5ea0fb7a"
@@ -449,6 +456,13 @@ cookie@^0.6.0:
   resolved "https://registry.yarnpkg.com/cookie/-/cookie-0.6.0.tgz#2798b04b071b0ecbff0dbb62a505a8efa4e19051"
   integrity sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw==
 
+d3-array@^2.3.1:
+  version "2.12.1"
+  resolved "https://registry.yarnpkg.com/d3-array/-/d3-array-2.12.1.tgz#e20b41aafcdffdf5d50928004ececf815a465e81"
+  integrity sha512-B0ErZK/66mHtEsR1TkPEEkwdy+WDesimkM5gpZr5Dsg54BiTA5RXtYW5qTLIAcekaS9xfZrzBLF/OAkB3Qn1YQ==
+  dependencies:
+    internmap "^1.0.0"
+
 debug@^4.3.7:
   version "4.4.0"
   resolved "https://registry.yarnpkg.com/debug/-/debug-4.4.0.tgz#2b3f2aea2ffeb776477460267377dc8710faba8a"
@@ -539,6 +553,13 @@ globrex@^0.1.2:
   resolved "https://registry.yarnpkg.com/globrex/-/globrex-0.1.2.tgz#dd5d9ec826232730cd6793a5e33a9302985e6098"
   integrity sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg==
 
+hilbert-curve@^2.0.5:
+  version "2.0.5"
+  resolved "https://registry.yarnpkg.com/hilbert-curve/-/hilbert-curve-2.0.5.tgz#8d2387abdaccddef3f470a45074770472839e68f"
+  integrity sha512-A3y2Wxxozptu83VlylD0HF+PPgjlZwNbAZL6+iJLltiFbDpeVs9JQPQU6/Tk6Dz3/2PxzgLfvcCppqseRsqt+w==
+  dependencies:
+    "@mhyfritz/bin-data" "0.0.3"
+
 immutable@^5.0.2:
   version "5.0.3"
   resolved "https://registry.yarnpkg.com/immutable/-/immutable-5.0.3.tgz#aa037e2313ea7b5d400cd9298fa14e404c933db1"
@@ -548,6 +569,11 @@ import-meta-resolve@^4.1.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/import-meta-resolve/-/import-meta-resolve-4.1.0.tgz#f9db8bead9fafa61adb811db77a2bf22c5399706"
   integrity sha512-I6fiaX09Xivtk+THaMfAwnA3MVA5Big1WHF1Dfx9hFuvNIWpXnorlkzhcQf6ehrqQiiZECRt1poOAkPmer3ruw==
+
+internmap@^1.0.0:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/internmap/-/internmap-1.0.1.tgz#0017cc8a3b99605f0302f2b198d272e015e5df95"
+  integrity sha512-lDB5YccMydFBtasVtxnZ3MRBHuaoE8GKsppq+EchKL2U4nK/DmEpPHNH8MZe5HkMtpSiTSOZwfN0tzYjO/lJEw==
 
 is-extglob@^2.1.1:
   version "2.1.1"
