@@ -14,6 +14,7 @@ use serde::Serialize;
 use sqlx::Error;
 use std::{collections::HashMap, future::Future, net::Ipv4Addr, pin::Pin, str::FromStr};
 use tracing::debug;
+use tracing::error;
 
 use super::AppState;
 
@@ -171,7 +172,7 @@ pub async fn map_one(
     if target_network.prefix() == 32 {
         return match sqlx::query_as::<_, Address>(
             r#"
-            SELECT allocation_state_id
+            SELECT *
             FROM "Addresses"
             WHERE id = $1
             "#,
@@ -191,7 +192,10 @@ pub async fn map_one(
                     routed: false,
                     online: false,
                 })),
-                _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                _ => {
+                    error!("Unknown error while getting address info: {}", error);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
             },
         };
     }

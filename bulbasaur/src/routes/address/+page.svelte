@@ -69,7 +69,7 @@
 	}
 </script>
 
-<div class="container-xl">
+<div class="container-xl p-3">
 	<div class="row justify-content-center mb-3">
 		<div class="col-6">
 			<input

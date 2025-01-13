@@ -33,6 +33,4 @@
 	</div>
 </nav>
 
-<div class="p-3">
 {@render children()}
-</div>
