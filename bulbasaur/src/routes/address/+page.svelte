@@ -4,13 +4,13 @@
 
 	interface Address {
 		id: string;
-		allocation_state: string;
+		allocation_state_id: string;
 		allocation_state_comment: string | null;
 		routed: boolean;
 		online: boolean;
-		top_rir: string;
-		rir: string;
-		autsys: string;
+		top_rir_id: string;
+		rir_id: string;
+		autsys_id: string;
 		country: string;
 		updated_at: string;
 	}
@@ -40,6 +40,7 @@
 	}
 
 	let address: Address | null = $state(null);
+    let errorMessage = $state("");
 	let addressValue = $state('');
 	let addressDelay: number;
 
@@ -47,9 +48,17 @@
 		if (/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/.test(addressValue)) {
 			try {
 				let res = await fetch(`${PUBLIC_API_URL}/address/${addressValue}`);
-				address = await res.json();
+                switch (res.status) {
+                    case 200:
+                        address = (await res.json())[0];
+                        break;
+
+                    case 404:
+                        address = null;
+                        errorMessage = "Pro tuto adresu nebyl nalezen žádný záznam..."
+                }
 			} catch (err) {
-				// error handling
+                console.error(err);
 			}
 		}
 	}
@@ -88,7 +97,7 @@
 						</tr>
 						<tr>
 							<td>Stav alokace</td>
-							<td>{allocStateHandler(address.allocation_state)}</td>
+							<td>{allocStateHandler(address.allocation_state_id)}</td>
 						</tr>
 						<tr>
 							<td>Směrovaná</td>
@@ -100,15 +109,15 @@
 						</tr>
 						<tr>
 							<td>Vrchní RIR</td>
-							<td>{rirHandler(address.top_rir)}</td>
+							<td>{rirHandler(address.top_rir_id)}</td>
 						</tr>
 						<tr>
 							<td>RIR</td>
-							<td>{rirHandler(address.rir)}</td>
+							<td>{rirHandler(address.rir_id)}</td>
 						</tr>
 						<tr>
 							<td>Autonomní systém</td>
-							<td>{address.autsys ?? "??"}</td>
+							<td>{address.autsys_id ?? "??"}</td>
 						</tr>
 						<tr>
 							<td>Země</td>
@@ -120,7 +129,9 @@
 						</tr>
 					</tbody>
 				</table>
-			{/if}
+			{:else}
+                <p>{errorMessage}</p>
+            {/if}
 		</div>
 	</div>
 </div>

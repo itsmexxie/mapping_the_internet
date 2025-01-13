@@ -10,7 +10,7 @@ diesel   = ["dep:chrono", "dep:diesel", "dep:urlencoding"]
 pokedex  = ["serde", "sqlx", "dep:futures", "dep:tokio-tungstenite"]
 rustls   = ["dep:rustls"]
 serde    = ["dep:serde", "dep:serde_json"]
-sqlx     = ["dep:chrono", "dep:sqlx", "dep:urlencoding"]
+sqlx     = ["dep:chrono", "dep:ipnetwork", "dep:sqlx", "dep:urlencoding"]
 
 [dependencies]
 axum = { version = "0.8.1", optional = true }
@@ -20,6 +20,7 @@ config = { version = "0.15.4", default-features = false, features = [
 ], optional = true }
 diesel = { version = "2.2.6", features = ["postgres"], optional = true }
 futures = { version = "0.3.31", optional = true }
+ipnetwork = { version = "0.20.0", features = ["serde"], optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }
 reqwest = { version = "0.12.9", features = ["json"] }
 rustls = { version = "0.23.20", features = ["ring"], optional = true }

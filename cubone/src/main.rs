@@ -14,7 +14,6 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 pub mod api;
-pub mod models;
 pub mod settings;
 
 /*

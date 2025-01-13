@@ -8,9 +8,8 @@ use axum::{
     Json, Router,
 };
 use ipnetwork::{IpNetwork, Ipv4Network};
+use mtilib::db::models::Address;
 use tracing::error;
-
-use crate::models;
 
 use super::AppState;
 
@@ -25,7 +24,7 @@ pub async fn address_one(
 
     let mut db_conn = state.db_pool.acquire().await.unwrap();
 
-    match sqlx::query_as::<_, models::Address>(
+    match sqlx::query_as::<_, Address>(
         r#"
 		SELECT *
 		FROM "Addresses"
@@ -66,7 +65,7 @@ pub async fn address_network(
 
     let mut db_conn = state.db_pool.acquire().await.unwrap();
 
-    match sqlx::query_as::<_, models::Address>(
+    match sqlx::query_as::<_, Address>(
         r#"
 		SELECT *
 		FROM "Addresses"

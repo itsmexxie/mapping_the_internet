@@ -53,7 +53,7 @@ paths:
           description: "No record was found for the specified IP address"
   /map/{address}/{prefixLength}:
     get:
-      summary: "Get the allocation state with the highest occurence in the specified IPv4 network. Prefix length must be one of 8, 16, 24, 32. The mapping algorithm uses AllocationState::Unknown for missing records instead of returning a 404 error"
+      summary: "Get the values with the highest occurence in the specified IPv4 network. Prefix length must be one of 8, 16, 24, 32. The mapping algorithm uses AllocationState::Unknown / false for missing records instead of returning a 404 error"
       parameters:
         - $ref: "#/components/parameters/addressParam"
         - name: prefixLength
@@ -63,7 +63,7 @@ paths:
             type: number
       responses:
         200:
-          description: "Allocation state id"
+          description: "Values with the highest occurence"
         400:
           description: "Wrong IPv4 address / prefix length specified"
   /_unit:

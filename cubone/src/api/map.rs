@@ -1,24 +1,26 @@
-use std::{collections::HashMap, future::Future, net::Ipv4Addr, pin::Pin, str::FromStr};
-
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::IntoResponse,
     routing::get,
-    Router,
+    Json, Router,
 };
 use ipnetwork::{IpNetwork, Ipv4Network};
-use mtilib::types::AllocationState;
+use mtilib::{
+    db::models::{Address, AddressMap},
+    types::AllocationState,
+};
+use serde::Serialize;
 use sqlx::Error;
+use std::{collections::HashMap, future::Future, net::Ipv4Addr, pin::Pin, str::FromStr};
 use tracing::debug;
-
-use crate::models::{Address, AddressMap};
 
 use super::AppState;
 
 pub fn get_network_average(
     network: Ipv4Network,
     db_pool: mtilib::db::DbPool,
-) -> Pin<Box<dyn Future<Output = Result<AllocationState, Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = Result<(AllocationState, bool, bool), Error>> + Send>> {
     Box::pin(async move {
         let wrapped_network = IpNetwork::V4(network);
 
@@ -33,12 +35,18 @@ pub fn get_network_average(
         .fetch_one(&mut *db_pool.acquire().await.unwrap())
         .await
         {
-            Ok(state) => Ok(AllocationState::from_str(&state.allocation_state_id).unwrap()),
+            Ok(map) => Ok((
+                AllocationState::from_str(&map.allocation_state_id).unwrap(),
+                map.routed,
+                map.online,
+            )),
             Err(error) => match error {
                 Error::RowNotFound => {
                     debug!("cached map for {} not found, calculating...", network);
                     let start = network.network().to_bits();
                     let mut state_occurence: HashMap<AllocationState, u32> = HashMap::new();
+                    let mut routed_occurence: HashMap<bool, u32> = HashMap::new();
+                    let mut online_occurence: HashMap<bool, u32> = HashMap::new();
 
                     if network.prefix() == 24 {
                         match sqlx::query_as::<_, Address>(
@@ -61,6 +69,9 @@ pub fn get_network_average(
                                                 .unwrap(),
                                         )
                                         .or_insert(0) += 1;
+                                    *routed_occurence.entry(row.routed).or_insert(0) += 1;
+                                    *online_occurence.entry(row.online).or_insert(0) += 1;
+
                                     i += 1;
                                 }
 
@@ -80,36 +91,50 @@ pub fn get_network_average(
                             )
                             .unwrap();
 
-                            *state_occurence
-                                .entry(
-                                    match get_network_average(new_network, db_pool.clone()).await {
-                                        Ok(average) => average,
-                                        Err(error) => return Err(error),
-                                    },
-                                )
-                                .or_insert(0) += 1;
+                            let average = get_network_average(new_network, db_pool.clone()).await?;
+                            *state_occurence.entry(average.0).or_insert(0) += 1;
+                            *routed_occurence.entry(average.1).or_insert(0) += 1;
+                            *online_occurence.entry(average.2).or_insert(0) += 1;
                         }
                     }
 
-                    let max = state_occurence
+                    let average_state = state_occurence
                         .iter()
                         .max_by(|a, b| a.1.cmp(b.1))
                         .map(|(k, _v)| k)
                         .unwrap_or(&AllocationState::Unknown);
+                    let (average_routed, average_online) = match average_state {
+                        AllocationState::Allocated => {
+                            let routed = routed_occurence
+                                .iter()
+                                .max_by(|a, b| a.1.cmp(b.1))
+                                .map(|(k, _v)| k)
+                                .unwrap_or(&false);
+                            let online = online_occurence
+                                .iter()
+                                .max_by(|a, b| a.1.cmp(b.1))
+                                .map(|(k, _v)| k)
+                                .unwrap_or(&false);
+                            (routed, online)
+                        }
+                        _ => (&false, &false),
+                    };
 
                     sqlx::query(
                         r#"
-						INSERT INTO "AddressMaps" (id, allocation_state_id)
-						VALUES ($1, $2)
+						INSERT INTO "AddressMaps" (id, allocation_state_id, routed, online)
+						VALUES ($1, $2, $3, $4)
 						"#,
                     )
                     .bind(wrapped_network)
-                    .bind(max.id())
+                    .bind(average_state.id())
+                    .bind(average_routed)
+                    .bind(average_online)
                     .execute(&mut *db_pool.acquire().await.unwrap())
                     .await
                     .unwrap();
 
-                    Ok(max.clone())
+                    Ok((average_state.clone(), false, false))
                 }
                 _ => Err(error),
             },
@@ -117,10 +142,17 @@ pub fn get_network_average(
     })
 }
 
+#[derive(Serialize)]
+struct MapOneResponse {
+    allocation_state: String,
+    routed: bool,
+    online: bool,
+}
+
 pub async fn map_one(
     Path((address, prefix_length)): Path<(String, u8)>,
     State(state): State<AppState>,
-) -> Result<String, StatusCode> {
+) -> impl IntoResponse {
     if ![8, 16, 24, 32].contains(&prefix_length) {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -137,7 +169,7 @@ pub async fn map_one(
     };
 
     if target_network.prefix() == 32 {
-        return match sqlx::query_scalar::<_, String>(
+        return match sqlx::query_as::<_, Address>(
             r#"
             SELECT allocation_state_id
             FROM "Addresses"
@@ -148,18 +180,30 @@ pub async fn map_one(
         .fetch_one(&mut *state.db_pool.acquire().await.unwrap())
         .await
         {
-            Ok(alloc_state) => Ok(alloc_state),
+            Ok(address) => Ok(Json(MapOneResponse {
+                allocation_state: address.allocation_state_id,
+                routed: address.routed,
+                online: address.online,
+            })),
             Err(error) => match error {
-                sqlx::Error::RowNotFound => Ok(AllocationState::Unknown.id().to_string()),
+                sqlx::Error::RowNotFound => Ok(Json(MapOneResponse {
+                    allocation_state: AllocationState::Unknown.id().to_string(),
+                    routed: false,
+                    online: false,
+                })),
                 _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
             },
         };
     }
 
     match get_network_average(target_network, state.db_pool.clone()).await {
-        Ok(average) => Ok(average.id().to_string()),
+        Ok(average) => Ok(Json(MapOneResponse {
+            allocation_state: average.0.id().to_string(),
+            routed: average.1,
+            online: average.2,
+        })),
         Err(error) => {
-            println!("{}", error);
+            println!("Error while getting network average: {}", error);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
