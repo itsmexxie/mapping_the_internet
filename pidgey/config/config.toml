@@ -8,7 +8,6 @@
 [pidgeotto]
 # connect = true    # Whether to intiate a connection to a pidgeotto instance. Defaults to true.
 # address =         # The address to use when connecting to a pidgeotto instance. The unit tries to connect to this one before trying to lookup available units via Pokedex. Optional.
-# port =            # The port to use when connecting to a pidgeotto instance. Optional.
 
 [pokedex]
 # address =			# The address used when connecting to a Pokedex instance.

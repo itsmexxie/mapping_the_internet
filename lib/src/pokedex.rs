@@ -169,9 +169,10 @@ impl Pokedex {
         }
     }
 
-    pub async fn get_service_units(&self, service_id: String) -> Vec<ServiceUnit> {
+    // TODO: Split this into separate structs - one for db, one for Pokedex
+    pub async fn get_service_units<S: AsRef<str>>(&self, service_id: S) -> Vec<ServiceUnit> {
         let mut service_units_url = self.address.clone();
-        service_units_url.set_path(&concat_string!("/v2/service/", service_id, "/units"));
+        service_units_url.set_path(&concat_string!("/v2/services/", service_id, "/units"));
 
         match reqwest::Client::new()
             .get(service_units_url)

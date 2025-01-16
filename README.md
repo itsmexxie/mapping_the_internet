@@ -45,10 +45,10 @@ An IPv4 address can be in one of the following allocation states:
 - [ ] (Pidgey) Pidgeotto service discovery via Pokedex
 - [ ] (Pidgeotto) Implement job queue and rework the scanning to progresivelly scan and add to queue
 - [ ] (Pidgeotto) Implement stale address records via updated_at timestamps
-- [ ] (Bulbasaur) Create the damn thing, maybe?
 - [ ] (Pidgey) Return the 500 error when Diglett responds with a 500 error
 - [ ] (Pidgeotto) Implement a timeout when waiting for a job response from Pidgey
 - [ ] (Diglett) Finish the transition to Settings
 - [ ] (Pokedex) Update example config and .gitignore
 - [ ] (Pidgeotto) Update example config and .gitignore
 - [x] (Pidgey) Update example config and .gitignore
+- [x] (Pidgey) Test Pidgeotto connect procedure

@@ -19,6 +19,20 @@ pub struct Address {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct NewAddress {
+    pub id: IpNetwork,
+    pub allocation_state_id: String,
+    pub allocation_state_comment: Option<String>,
+    pub routed: bool,
+    pub online: bool,
+    pub top_rir_id: Option<String>,
+    pub rir_id: Option<String>,
+    pub autsys_id: Option<i64>,
+    pub country: Option<String>,
+}
+
 #[derive(Debug, sqlx::FromRow)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AddressMap {
@@ -27,6 +41,12 @@ pub struct AddressMap {
     pub routed: bool,
     pub online: bool,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Autsys {
+    pub id: i64,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -41,7 +61,7 @@ pub struct Service {
 pub struct ServiceUnit {
     pub id: Uuid,
     pub service_id: String,
-    pub address: Option<String>,
+    pub address: String,
     pub port: Option<i32>,
     pub created_at: DateTime<Utc>,
 }

@@ -126,20 +126,21 @@ async fn main() {
     });
 
     // Diglett setup
-    let diglett = Arc::new(Diglett::new(&config).await);
+    let diglett = Arc::new(Diglett::new(settings.clone(), pokedex.clone()).await);
 
     // Ping client setup
     let ping_client = Arc::new(surge_ping::Client::new(&surge_ping::Config::new()).unwrap());
 
     // Axum API task
     let axum_config = config.clone();
+    let axum_unit_uuid = unit_uuid.clone();
     let axum_worker_permits = worker_permits.clone();
     let axum_diglett = diglett.clone();
     let axum_ping_client = ping_client.clone();
     let axum_task_token = task_token.clone();
     task_tracker.spawn(async move {
         tokio::select! {
-            () = api::run(axum_config, unit_uuid, jwt_keys, axum_worker_permits, axum_diglett, axum_ping_client) => {
+            () = api::run(axum_config, axum_unit_uuid, jwt_keys, axum_worker_permits, axum_diglett, axum_ping_client) => {
                 info!("Axum API task exited on its own!");
             },
             () = axum_task_token.cancelled() => {
@@ -151,7 +152,7 @@ async fn main() {
     // Pidgeotto connection task
     task_tracker.spawn(async move {
         tokio::select! {
-            () = pidgeotto::run(config, worker_permits, pokedex, diglett, ping_client) => {
+            () = pidgeotto::run(settings, unit_uuid, worker_permits, pokedex, diglett, ping_client) => {
                 info!("Pidgeotto task exited on its own!")
             }
             () = task_token.cancelled() => {

@@ -10,20 +10,20 @@ use axum::{
     routing::{any, get},
     Json, Router,
 };
-use config::Config;
+use concat_string::concat_string;
 use mtilib::auth::{GetJWTKeys, JWTKeys};
 use serde::Serialize;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::pidgey::Pidgey;
+use crate::{pidgey::Pidgey, settings::Settings};
 
 pub mod ws;
 
 #[derive(Serialize)]
 struct UnitResponse {
-    uuid: Uuid,
+    uuid: Option<Uuid>,
 }
 
 async fn unit(State(state): State<AppState>) -> Json<UnitResponse> {
@@ -42,8 +42,8 @@ async fn index() -> impl IntoResponse {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub config: Arc<Config>,
-    pub unit_uuid: Arc<Uuid>,
+    pub settings: Arc<Settings>,
+    pub unit_uuid: Arc<Option<Uuid>>,
     pub jwt_keys: Arc<JWTKeys>,
     pub pidgey: Arc<Pidgey>,
 }
@@ -54,19 +54,17 @@ impl GetJWTKeys for AppState {
     }
 }
 
-pub struct ApiOptions {
-    pub config: Arc<Config>,
-    pub unit_uuid: Arc<Uuid>,
-    pub jwt_keys: Arc<JWTKeys>,
-    pub pidgey: Arc<Pidgey>,
-}
-
-pub async fn run(options: ApiOptions) {
+pub async fn run(
+    settings: Arc<Settings>,
+    unit_uuid: Arc<Option<Uuid>>,
+    jwt_keys: Arc<JWTKeys>,
+    pidgey: Arc<Pidgey>,
+) {
     let state = AppState {
-        config: options.config.clone(),
-        unit_uuid: options.unit_uuid,
-        jwt_keys: options.jwt_keys,
-        pidgey: options.pidgey,
+        settings: settings.clone(),
+        unit_uuid,
+        jwt_keys,
+        pidgey,
     };
 
     let app = Router::new()
@@ -82,18 +80,14 @@ pub async fn run(options: ApiOptions) {
         )
         .with_state(state)
         .layer(TraceLayer::new_for_http());
-    let app_port = options
-        .config
-        .get("api.port")
-        .expect("api.port must be set!");
 
     let listener = tokio::net::TcpListener::bind(SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-        app_port,
+        settings.api.port,
     ))
     .await
     .unwrap();
 
-    info!("Listening on port {}!", app_port);
+    info!("Listening on port {}!", settings.api.port);
     axum::serve(listener, app).await.unwrap();
 }

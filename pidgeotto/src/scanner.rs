@@ -1,49 +1,39 @@
+use ipnetwork::{IpNetwork, Ipv4Network};
+use mtilib::db::models::NewAddress;
+use mtilib::db::DbPool;
+use mtilib::pidgey::{PidgeyCommand, PidgeyCommandPayload, PidgeyCommandResponsePayload};
+use sqlx::QueryBuilder;
 use std::collections::{HashMap, HashSet};
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use std::sync::Arc;
-
-use config::Config;
-use diesel::query_dsl::methods::{FilterDsl, SelectDsl};
-use diesel::{ExpressionMethods, RunQueryDsl, SelectableHelper};
-use ipnetwork::{IpNetwork, Ipv4Network};
-use mtilib::pidgey::PidgeyCommand;
 use tokio::sync::{Mutex, Semaphore};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use crate::models::{Address, Asn};
-use crate::pidgey::{Pidgey, PidgeyUnitRequest, PidgeyUnitResponse};
-use crate::schema::{Addresses, Asns};
+use crate::pidgey::{Pidgey, PidgeyUnitRequest};
+use crate::settings::Settings;
 
-pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
-    let pg_conn = &mut crate::db::create_conn(&config);
-    let batch = config.get_int("settings.scanner.batch").unwrap_or(1024) as u32;
-    let task_permits = Arc::new(Semaphore::new(
-        config.get_int("settings.scanner.max_tasks").unwrap_or(512) as usize,
-    ));
+pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) {
+    let task_permits = Arc::new(Semaphore::new(settings.scanner.max_tasks));
 
     info!(
         "Running scanner with batch size of {} and maximum number of tasks of {}!",
-        batch,
+        settings.scanner.batch,
         task_permits.available_permits()
     );
 
     // Query the database for records in that range
     // Query pidgeys for the missing records
     // Write to database
-    let mut curr_address: u32 = Ipv4Addr::from_str(
-        &config
-            .get_string("settings.scanner.start")
-            .unwrap_or("0.0.0.0".to_string()),
-    )
-    .unwrap()
-    .to_bits();
+    let mut curr_address = Ipv4Addr::from_str(&settings.scanner.start)
+        .unwrap()
+        .to_bits();
 
     loop {
         // Calculate current range for query
         let mut addresses_scanning = Vec::new();
-        for i in curr_address..curr_address + batch {
+        for i in curr_address..curr_address + settings.scanner.batch {
             addresses_scanning.push(IpNetwork::V4(
                 Ipv4Network::new(Ipv4Addr::from_bits(i), 32).unwrap(),
             ));
@@ -56,15 +46,17 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
         );
 
         // Check which addresses are already in our database
-        let addresses_query: Vec<Address> = Addresses::table
-            .select(Address::as_select())
-            .filter(Addresses::id.eq_any(&addresses_scanning))
-            .load(pg_conn)
-            .unwrap();
-        let addresses_in_db = addresses_query
-            .into_iter()
-            .map(|x| x.id)
-            .collect::<Vec<_>>();
+        let addresses_in_db = sqlx::query_scalar::<_, IpNetwork>(
+            r#"
+            SELECT id
+            FROM "Addresses"
+            WHERE id = ANY($1)
+            "#,
+        )
+        .bind(addresses_scanning.clone())
+        .fetch_all(&mut *db_pool.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         let mut address_tasks = Vec::new();
         let query_results = Arc::new(Mutex::new(HashMap::new()));
@@ -80,9 +72,9 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
                         let unit = cloned_pidgey.get_unit().await;
 
                         let (job_tx, job_rx) =
-                            tokio::sync::oneshot::channel::<PidgeyUnitResponse>();
+                            tokio::sync::oneshot::channel::<PidgeyCommandResponsePayload>();
 
-                        let uuid = Uuid::new_v4();
+                        let job_uuid = Uuid::new_v4();
                         let ipaddr = match address.ip() {
                             std::net::IpAddr::V4(ipv4_addr) => ipv4_addr,
                             std::net::IpAddr::V6(_) => panic!("This should never happen"),
@@ -90,12 +82,9 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
 
                         unit.tx
                             .send(PidgeyUnitRequest {
-                                id: uuid,
-                                command: PidgeyCommand::Query {
-                                    id: uuid,
-                                    address: ipaddr,
-                                    ports_start: Some(1),
-                                    ports_end: Some(999),
+                                command: PidgeyCommand {
+                                    id: job_uuid,
+                                    payload: PidgeyCommandPayload::Query { address: ipaddr },
                                 },
                                 response: job_tx,
                             })
@@ -130,43 +119,42 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
         let new_addresses = query_results
             .into_iter()
             .map(|x| match x.1 {
-                PidgeyUnitResponse::Query {
+                PidgeyCommandResponsePayload::Query {
                     allocation_state,
                     top_rir,
                     rir,
-                    asn,
+                    autsys,
                     country,
                     online,
-                    ports,
                 } => {
+                    let top_rir_id = match top_rir {
+                        Some(top_rir) => Some(top_rir.id().to_string()),
+                        None => None,
+                    };
+
+                    let rir_id = match rir {
+                        Some(rir) => Some(rir.id().to_string()),
+                        None => None,
+                    };
+
                     let mut routed = false;
-                    let asn = match asn {
-                        Some(asn) => {
+                    let autsys_id = match autsys {
+                        Some(autsys) => {
                             routed = true;
-                            Some(asn as i32)
+                            Some(autsys as i64)
                         }
                         None => None,
                     };
 
-                    let ports = match ports {
-                        Some(ports) => ports
-                            .into_iter()
-                            .filter(|p| p.1)
-                            .map(|x| x.0 as i32)
-                            .collect::<Vec<_>>(),
-                        None => Vec::new(),
-                    };
-
-                    Address {
+                    NewAddress {
                         id: x.0,
-                        allocation_state_id: allocation_state.id(),
+                        allocation_state_id: allocation_state.id().to_string(),
                         allocation_state_comment: None,
-                        top_rir_id: top_rir,
-                        rir_id: rir,
-                        asn_id: asn,
+                        top_rir_id,
+                        rir_id,
+                        autsys_id,
                         routed,
                         online,
-                        ports,
                         country,
                     }
                 }
@@ -174,44 +162,62 @@ pub async fn run(config: Arc<Config>, pidgey: Arc<Pidgey>) {
             })
             .collect::<Vec<_>>();
 
-        if !config.get_bool("settings.dry_run").unwrap_or(false) {
-            // Check which ASs are already in our database
-            // Unfortunate naming scheme ¯\_(ツ)_/¯
-            let curr_autsyses = new_addresses
-                .iter()
-                .filter(|x| x.asn_id.is_some())
-                .map(|x| x.asn_id.unwrap())
-                .collect::<HashSet<i32>>();
+        // Check which Autsyses are already in our database
+        let new_autsyses = new_addresses
+            .iter()
+            .filter(|x| x.autsys_id.is_some())
+            .map(|x| x.autsys_id.unwrap())
+            .collect::<HashSet<i64>>();
 
-            let autsyses_db = Asns::table
-                .select(Asn::as_select())
-                .filter(Asns::id.eq_any(&curr_autsyses))
-                .load(pg_conn)
-                .unwrap()
-                .iter()
-                .map(|x| x.id)
-                .collect::<Vec<_>>();
+        let autsyses_in_db = HashSet::<_>::from_iter(
+            sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT id
+                FROM "Autsyses"
+                WHERE id = ANY($1)
+                "#,
+            )
+            .bind(new_autsyses.iter().collect::<Vec<_>>())
+            .fetch_all(&mut *db_pool.acquire().await.unwrap())
+            .await
+            .unwrap()
+            .into_iter(),
+        );
 
-            let mut new_autsyses = Vec::new();
-            for curr_autsys in curr_autsyses {
-                if !autsyses_db.contains(&curr_autsys) {
-                    new_autsyses.push(Asn { id: curr_autsys });
-                }
-            }
+        sqlx::query(
+            r#"
+            INSERT INTO "Autsyses" (id)
+            SELECT * FROM UNNEST($1)
+            RETURNING id
+            "#,
+        )
+        .bind(new_autsyses.difference(&autsyses_in_db).collect::<Vec<_>>())
+        .execute(&mut *db_pool.acquire().await.unwrap())
+        .await
+        .unwrap();
 
-            diesel::insert_into(Asns::dsl::Asns)
-                .values(new_autsyses)
-                .execute(pg_conn)
-                .unwrap();
+        let mut addresses_qb = QueryBuilder::new(
+            r#"INSERT INTO "Addresses" (id, allocation_state_id, allocation_state_comment, routed, online, top_rir_id, rir_id, autsys_id, country)"#,
+        );
 
-            diesel::insert_into(Addresses::dsl::Addresses)
-                .values(new_addresses)
-                .execute(pg_conn)
-                .unwrap();
-        }
+        addresses_qb.push_values(new_addresses, |mut b, new_address| {
+            b.push_bind(new_address.id)
+                .push_bind(new_address.allocation_state_id)
+                .push_bind(new_address.allocation_state_comment)
+                .push_bind(new_address.routed)
+                .push_bind(new_address.online)
+                .push_bind(new_address.top_rir_id)
+                .push_bind(new_address.rir_id)
+                .push_bind(new_address.autsys_id)
+                .push_bind(new_address.country);
+        });
 
-		if !config.get_bool("settings.cycle").unwrap_or(false) {
-			curr_address += batch;
-		}
+        let addresses_query = addresses_qb.build();
+        addresses_query
+            .execute(&mut *db_pool.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+        curr_address += settings.scanner.batch;
     }
 }

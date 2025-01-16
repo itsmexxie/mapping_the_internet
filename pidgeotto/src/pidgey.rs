@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use mtilib::{
-    pidgey::PidgeyCommand,
-    types::{AllocationState, Rir},
-};
+use mtilib::pidgey::{PidgeyCommand, PidgeyCommandResponsePayload};
 use rand::seq::IteratorRandom;
 use tokio::sync::{Notify, RwLock};
 use tracing::info;
@@ -28,32 +25,8 @@ impl PidgeyUnit {
 
 #[derive(Debug)]
 pub struct PidgeyUnitRequest {
-    pub id: Uuid,
     pub command: PidgeyCommand,
-    pub response: tokio::sync::oneshot::Sender<PidgeyUnitResponse>,
-}
-
-#[derive(Debug)]
-pub enum PidgeyUnitResponse {
-    Query {
-        allocation_state: AllocationState,
-        top_rir: Option<Rir>,
-        rir: Option<Rir>,
-        asn: Option<u32>,
-        country: Option<String>,
-        online: bool,
-        ports: Option<HashMap<u16, bool>>,
-    },
-    AllocationState(AllocationState),
-    Rir(Option<Rir>),
-    Asn(Option<u32>),
-    Country(Option<String>),
-    Online {
-        value: bool,
-        reason: Option<String>,
-    },
-    PortRange(HashMap<u16, bool>),
-    Port(bool),
+    pub response: tokio::sync::oneshot::Sender<PidgeyCommandResponsePayload>,
 }
 
 #[derive(Debug)]
