@@ -33,22 +33,33 @@ async fn shutdown(
 
 /*
  * == STATIC ==
- * 1. Tracing
- * 2. Settings
- * 3. Load JWT keys
+ * 1. Sprite
+ * 2. Tracing
+ * 3. Settings
+ * 4. Load JWT keys
  * == POKEDEX ==
- * 4. Register unit with database
+ * 5. Register unit with database
  * == TOKIO ==
- * 5. Tokio setup
- * 6. Graceful shutdown task
+ * 6. Tokio setup
+ * 7. Graceful shutdown task
  * == RUNTIME ==
- * 7. Create database connection pool
- * 8. Axum API task
+ * 8. Create database connection pool
+ * 9. Axum API task
  */
 #[tokio::main]
 async fn main() {
     // Tracing
     tracing_subscriber::fmt::init();
+
+    // Sprite
+    // match Sprite::load("sprite.txt").await {
+    //     Ok(mut sprite) => {
+    //         if let Err(error) = sprite.print().await {
+    //             error!("Failed to print sprite ({})", error);
+    //         }
+    //     }
+    //     Err(error) => error!("Failed to load sprite ({})", error),
+    // }
 
     // Settings
     let (config, settings) = mtilib::settings::deserialize_from_config("daemon.config.toml");
@@ -119,6 +130,7 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
+                        info!("CTRL+C signal received, shutting down...");
                         shutdown(signal_task_db_pool, signal_task_tracker, signal_task_token).await;
                     }
                     Err(err) => {
@@ -127,6 +139,7 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
+                info!("Sigterm signal received, shutting down...");
                 shutdown(signal_task_db_pool, signal_task_tracker, signal_task_token).await;
             }
         }

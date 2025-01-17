@@ -1,0 +1,27 @@
+openapi: 3.0.0
+info:
+  title: "Pidgeotto API"
+  description: "A service which manages Pidgey units and uses them to query missing or stale information about addresses"
+  version: "0.1.0"
+
+paths:
+  /_unit:
+    get:
+      summary: "Unit information"
+      responses:
+        200:
+          description: "Object containing information about the unit"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uuid:
+                    type: string
+                    example: "5ac09ff9-ab5a-4a33-9d62-387e07b2c99b"
+  /_health:
+    get:
+      summary: "Health status"
+      responses:
+        200:
+          description: "OK"

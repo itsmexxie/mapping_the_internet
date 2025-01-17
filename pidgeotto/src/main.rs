@@ -1,6 +1,7 @@
 use mtilib::{
     auth::JWTKeys,
     pokedex::{Pokedex, Url},
+    Sprite,
 };
 use pidgey::Pidgey;
 use settings::Settings;
@@ -39,6 +40,16 @@ pub mod settings;
 async fn main() {
     // Tracing
     tracing_subscriber::fmt::init();
+
+    // Sprite
+    match Sprite::load("sprite.txt").await {
+        Ok(mut sprite) => {
+            if let Err(error) = sprite.print().await {
+                error!("Failed to print sprite ({})", error);
+            }
+        }
+        Err(error) => error!("Failed to load sprite ({})", error),
+    }
 
     // Config
     let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
@@ -99,8 +110,7 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        // Logout of Pokedex
-                        info!("Successfully logged out of Pokedex!");
+                        info!("CTRL+C signal received, shutting down...");
 
                         // Cancel all tasks
                         signal_task_tracker.close();
@@ -112,8 +122,7 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
-                // Logout of Pokedex
-                info!("Successfully logged out of Pokedex!");
+                info!("Sigterm signal received, shutting down...");
 
                 // Cancel all tasks
                 signal_task_tracker.close();

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use diglett::Diglett;
-use mtilib::{auth::JWTKeys, pokedex::Pokedex};
+use mtilib::{auth::JWTKeys, pokedex::Pokedex, Sprite};
 use settings::Settings;
 use tokio::{
     signal::{self, unix::SignalKind},
@@ -40,6 +40,16 @@ pub const MAX_WORKERS: usize = 64;
 async fn main() {
     // Tracing
     tracing_subscriber::fmt::init();
+
+    // Sprite
+    match Sprite::load("sprite.txt").await {
+        Ok(mut sprite) => {
+            if let Err(error) = sprite.print().await {
+                error!("Failed to print sprite ({})", error);
+            }
+        }
+        Err(error) => error!("Failed to load sprite ({})", error),
+    }
 
     // Something for WSS
     rustls::crypto::ring::default_provider()
@@ -108,6 +118,8 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
+                        info!("CTRL+C signal received, shutting down...");
+
                         // Cancel all tasks
                         signal_task_tracker.close();
                         signal_task_token.cancel();
@@ -118,6 +130,8 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
+                info!("Sigterm signal received, shutting down...");
+
                 // Cancel all tasks
                 signal_task_tracker.close();
                 signal_task_token.cancel();

@@ -1,13 +1,12 @@
 use mtilib::{
     auth::JWTKeys,
     pokedex::{Pokedex, Url},
+    Sprite,
 };
 use providers::Providers;
 use settings::Settings;
 use std::sync::Arc;
 use tokio::{
-    fs::File,
-    io,
     signal::{self, unix::SignalKind},
     sync::{oneshot, Mutex, RwLock},
 };
@@ -41,17 +40,18 @@ extern crate concat_string;
  */
 #[tokio::main]
 async fn main() {
-    // Sprite
-    let sprite_file = File::open("sprite.txt")
-        .await
-        .expect("Failed to read sprite file!");
-    let mut reader = io::BufReader::new(sprite_file);
-    io::copy(&mut reader, &mut io::stdout())
-        .await
-        .expect("Failed to copy sprite to stdout!");
-
     // Tracing
     tracing_subscriber::fmt::init();
+
+    // Sprite
+    match Sprite::load("sprite.txt").await {
+        Ok(mut sprite) => {
+            if let Err(error) = sprite.print().await {
+                error!("Failed to print sprite ({})", error);
+            }
+        }
+        Err(error) => error!("Failed to load sprite ({})", error),
+    }
 
     // Settings
     let (config, settings) = mtilib::settings::deserialize_from_config("config.toml");
@@ -115,7 +115,7 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
-                        info!("Successfully logged out of Pokedex!");
+                        info!("CTRL+C signal received, shutting down...");
 
                         // Cancel all tasks
                         signal_task_tracker.close();
@@ -127,8 +127,7 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
-                // Logout of Pokedex
-                info!("Successfully logged out of Pokedex!");
+                info!("Sigterm signal received, shutting down...");
 
                 // Cancel all tasks
                 signal_task_tracker.close();

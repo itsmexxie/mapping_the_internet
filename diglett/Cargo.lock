@@ -1462,6 +1462,7 @@ dependencies = [
  "ipnetwork",
  "jsonwebtoken",
  "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sqlx",

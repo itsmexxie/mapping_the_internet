@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use mtilib::pokedex::{Pokedex, Url};
+use mtilib::{
+    pokedex::{Pokedex, Url},
+    Sprite,
+};
 use settings::Settings;
 use sqlx::PgPool;
 use tokio::{
-    fs::File,
-    io,
     signal::{self, unix::SignalKind},
     sync::{oneshot, Mutex},
 };
@@ -34,17 +35,18 @@ pub mod settings;
  */
 #[tokio::main]
 async fn main() {
-    // Sprite
-    let sprite_file = File::open("sprite.txt")
-        .await
-        .expect("Failed to read sprite file!");
-    let mut reader = io::BufReader::new(sprite_file);
-    io::copy(&mut reader, &mut io::stdout())
-        .await
-        .expect("Failed to copy sprite to stdout!");
-
     // Tracing
     tracing_subscriber::fmt::init();
+
+    // Sprite
+    match Sprite::load("sprite.txt").await {
+        Ok(mut sprite) => {
+            if let Err(error) = sprite.print().await {
+                error!("Failed to print sprite ({})", error);
+            }
+        }
+        Err(error) => error!("Failed to load sprite ({})", error),
+    }
 
     // Settings
     let (_, settings) = mtilib::settings::deserialize_from_config("config.toml");
@@ -96,10 +98,11 @@ async fn main() {
             result = signal::ctrl_c() => {
                 match result {
                     Ok(_) => {
+                        info!("CTRL+C signal received, shutting down...");
+
                         // Cancel all tasks
                         signal_task_tracker.close();
                         signal_task_token.cancel();
-                        println!("shutting down");
                     }
                     Err(err) => {
                         error!("Unable to listen for shutdown signal: {}", err);
@@ -107,6 +110,8 @@ async fn main() {
                 }
             }
             _ = sigterm.recv() => {
+                info!("Sigterm signal received, shutting down...");
+
                 // Cancel all tasks
                 signal_task_tracker.close();
                 signal_task_token.cancel();

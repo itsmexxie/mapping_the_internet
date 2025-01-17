@@ -115,108 +115,110 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
             Err(_) => panic!("Failed to unwrap arc"),
         };
 
-        // Create new records
-        let new_addresses = query_results
-            .into_iter()
-            .map(|x| match x.1 {
-                PidgeyCommandResponsePayload::Query {
-                    allocation_state,
-                    top_rir,
-                    rir,
-                    autsys,
-                    country,
-                    online,
-                } => {
-                    let top_rir_id = match top_rir {
-                        Some(top_rir) => Some(top_rir.id().to_string()),
-                        None => None,
-                    };
-
-                    let rir_id = match rir {
-                        Some(rir) => Some(rir.id().to_string()),
-                        None => None,
-                    };
-
-                    let mut routed = false;
-                    let autsys_id = match autsys {
-                        Some(autsys) => {
-                            routed = true;
-                            Some(autsys as i64)
-                        }
-                        None => None,
-                    };
-
-                    NewAddress {
-                        id: x.0,
-                        allocation_state_id: allocation_state.id().to_string(),
-                        allocation_state_comment: None,
-                        top_rir_id,
-                        rir_id,
-                        autsys_id,
-                        routed,
-                        online,
+        if query_results.len() > 0 {
+            // Create new records
+            let new_addresses = query_results
+                .into_iter()
+                .map(|x| match x.1 {
+                    PidgeyCommandResponsePayload::Query {
+                        allocation_state,
+                        top_rir,
+                        rir,
+                        autsys,
                         country,
+                        online,
+                    } => {
+                        let top_rir_id = match top_rir {
+                            Some(top_rir) => Some(top_rir.id().to_string()),
+                            None => None,
+                        };
+
+                        let rir_id = match rir {
+                            Some(rir) => Some(rir.id().to_string()),
+                            None => None,
+                        };
+
+                        let mut routed = false;
+                        let autsys_id = match autsys {
+                            Some(autsys) => {
+                                routed = true;
+                                Some(autsys as i64)
+                            }
+                            None => None,
+                        };
+
+                        NewAddress {
+                            id: x.0,
+                            allocation_state_id: allocation_state.id().to_string(),
+                            allocation_state_comment: None,
+                            top_rir_id,
+                            rir_id,
+                            autsys_id,
+                            routed,
+                            online,
+                            country,
+                        }
                     }
-                }
-                _ => panic!("Should not be here!"),
-            })
-            .collect::<Vec<_>>();
+                    _ => panic!("Should not be here!"),
+                })
+                .collect::<Vec<_>>();
 
-        // Check which Autsyses are already in our database
-        let new_autsyses = new_addresses
-            .iter()
-            .filter(|x| x.autsys_id.is_some())
-            .map(|x| x.autsys_id.unwrap())
-            .collect::<HashSet<i64>>();
+            // Check which Autsyses are already in our database
+            let new_autsyses = new_addresses
+                .iter()
+                .filter(|x| x.autsys_id.is_some())
+                .map(|x| x.autsys_id.unwrap())
+                .collect::<HashSet<i64>>();
 
-        let autsyses_in_db = HashSet::<_>::from_iter(
-            sqlx::query_scalar::<_, i64>(
+            let autsyses_in_db = HashSet::<_>::from_iter(
+                sqlx::query_scalar::<_, i64>(
+                    r#"
+                        SELECT id
+                        FROM "Autsyses"
+                        WHERE id = ANY($1)
+                        "#,
+                )
+                .bind(new_autsyses.iter().collect::<Vec<_>>())
+                .fetch_all(&mut *db_pool.acquire().await.unwrap())
+                .await
+                .unwrap()
+                .into_iter(),
+            );
+
+            sqlx::query(
                 r#"
-                SELECT id
-                FROM "Autsyses"
-                WHERE id = ANY($1)
-                "#,
+                    INSERT INTO "Autsyses" (id)
+                    SELECT * FROM UNNEST($1)
+                    RETURNING id
+                    "#,
             )
-            .bind(new_autsyses.iter().collect::<Vec<_>>())
-            .fetch_all(&mut *db_pool.acquire().await.unwrap())
-            .await
-            .unwrap()
-            .into_iter(),
-        );
-
-        sqlx::query(
-            r#"
-            INSERT INTO "Autsyses" (id)
-            SELECT * FROM UNNEST($1)
-            RETURNING id
-            "#,
-        )
-        .bind(new_autsyses.difference(&autsyses_in_db).collect::<Vec<_>>())
-        .execute(&mut *db_pool.acquire().await.unwrap())
-        .await
-        .unwrap();
-
-        let mut addresses_qb = QueryBuilder::new(
-            r#"INSERT INTO "Addresses" (id, allocation_state_id, allocation_state_comment, routed, online, top_rir_id, rir_id, autsys_id, country)"#,
-        );
-
-        addresses_qb.push_values(new_addresses, |mut b, new_address| {
-            b.push_bind(new_address.id)
-                .push_bind(new_address.allocation_state_id)
-                .push_bind(new_address.allocation_state_comment)
-                .push_bind(new_address.routed)
-                .push_bind(new_address.online)
-                .push_bind(new_address.top_rir_id)
-                .push_bind(new_address.rir_id)
-                .push_bind(new_address.autsys_id)
-                .push_bind(new_address.country);
-        });
-
-        let addresses_query = addresses_qb.build();
-        addresses_query
+            .bind(new_autsyses.difference(&autsyses_in_db).collect::<Vec<_>>())
             .execute(&mut *db_pool.acquire().await.unwrap())
             .await
             .unwrap();
+
+            let mut addresses_qb = QueryBuilder::new(
+                r#"INSERT INTO "Addresses" (id, allocation_state_id, allocation_state_comment, routed, online, top_rir_id, rir_id, autsys_id, country)"#,
+            );
+
+            addresses_qb.push_values(new_addresses, |mut b, new_address| {
+                b.push_bind(new_address.id)
+                    .push_bind(new_address.allocation_state_id)
+                    .push_bind(new_address.allocation_state_comment)
+                    .push_bind(new_address.routed)
+                    .push_bind(new_address.online)
+                    .push_bind(new_address.top_rir_id)
+                    .push_bind(new_address.rir_id)
+                    .push_bind(new_address.autsys_id)
+                    .push_bind(new_address.country);
+            });
+
+            let addresses_query = addresses_qb.build();
+            addresses_query
+                .execute(&mut *db_pool.acquire().await.unwrap())
+                .await
+                .unwrap();
+        }
 
         curr_address += settings.scanner.batch;
     }

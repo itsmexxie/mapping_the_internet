@@ -6,4 +6,7 @@ pub mod pidgey;
 pub mod pokedex;
 #[cfg(feature = "settings")]
 pub mod settings;
+pub mod sprite;
 pub mod types;
+
+pub use sprite::Sprite;
