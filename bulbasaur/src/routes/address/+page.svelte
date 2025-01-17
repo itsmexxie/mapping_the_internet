@@ -40,9 +40,9 @@
 	}
 
 	let address: Address | null = $state(null);
-    let errorMessage = $state("");
 	let addressValue = $state('');
 	let addressDelay: number;
+    let message = $state("");
 
 	async function updateAddressInfo() {
 		if (/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/.test(addressValue)) {
@@ -55,12 +55,15 @@
 
                     case 404:
                         address = null;
-                        errorMessage = "Pro tuto adresu nebyl nalezen žádný záznam..."
+                        message = "Pro tuto adresu nebyl nalezen žádný záznam..."
                 }
 			} catch (err) {
                 console.error(err);
 			}
-		}
+		} else {
+            address = null;
+            message = "Zadejte platnou IPv4 adresu!";
+        }
 	}
 
 	function onAddressInput() {
@@ -130,7 +133,7 @@
 					</tbody>
 				</table>
 			{:else}
-                <p>{errorMessage}</p>
+                <p>{message}</p>
             {/if}
 		</div>
 	</div>
