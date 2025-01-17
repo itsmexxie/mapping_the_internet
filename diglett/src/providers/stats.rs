@@ -138,7 +138,7 @@ impl StatsProvider {
 
                 let mut stat_entries = Vec::new();
                 for source in sources.iter() {
-                    stat_entries.append(&mut StatsProvider::load_source(&source).await);
+                    stat_entries.append(&mut StatsProvider::load_source(source).await);
                 }
 
                 info!("Loaded ARIN stats!");

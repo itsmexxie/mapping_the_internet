@@ -65,7 +65,7 @@ async fn connect(
 > {
     if let Some(pidgeotto_settings) = settings.pidgeotto.as_ref() {
         if let Some(pidgeotto_address) = pidgeotto_settings.address.as_ref() {
-            if let Ok(pidgeotto_url) = Url::parse(&pidgeotto_address) {
+            if let Ok(pidgeotto_url) = Url::parse(pidgeotto_address) {
                 match try_connect(&pidgeotto_url, &pokedex.lock().await.get_token()).await {
                     Ok(ws_stream) => return Ok(ws_stream),
                     Err(error) => return Err(PidgeottoError::Tungstenite(error)),

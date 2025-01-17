@@ -134,14 +134,14 @@ pub struct Providers {
 impl Providers {
     pub async fn load(config: &Config) -> Self {
         Providers {
-            stats: StatsProvider::load(&config).await,
+            stats: StatsProvider::load(config).await,
             iana: iana::Providers {
-                reserved: iana::reserved::ReservedProvider::load(&config).await,
-                recovered: iana::recovered::RecoveredProvider::load(&config).await,
+                reserved: iana::reserved::ReservedProvider::load(config).await,
+                recovered: iana::recovered::RecoveredProvider::load(config).await,
             },
             thyme: thyme::Providers {
-                asn_prefixes: thyme::asn_prefixes::AsnPrefixesProvider::load(&config).await,
-                rir_allocations: thyme::rir_allocations::RirAllocationsProvider::load(&config)
+                asn_prefixes: thyme::asn_prefixes::AsnPrefixesProvider::load(config).await,
+                rir_allocations: thyme::rir_allocations::RirAllocationsProvider::load(config)
                     .await,
             },
         }

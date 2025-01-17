@@ -35,6 +35,12 @@ pub struct Pidgey {
     pub unit_available: Notify,
 }
 
+impl Default for Pidgey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pidgey {
     pub fn new() -> Self {
         Pidgey {
@@ -67,14 +73,14 @@ impl Pidgey {
     }
 
     pub async fn deregister_unit(&self, id: &Uuid) -> bool {
-        match self.units.write().await.remove(&id) {
+        match self.units.write().await.remove(id) {
             Some(_) => {
                 info!("Deregistered unit {}", id);
-                return true;
+                true
             }
             None => {
                 info!("Failed to deregister unit, no unit found! (id: {})", id);
-                return false;
+                false
             }
         }
     }

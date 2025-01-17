@@ -18,10 +18,12 @@ use tracing::error;
 
 use super::AppState;
 
+type NetworkAvgResult = Result<(AllocationState, bool, bool), Error>;
+
 pub fn get_network_average(
     network: Ipv4Network,
     db_pool: mtilib::db::DbPool,
-) -> Pin<Box<dyn Future<Output = Result<(AllocationState, bool, bool), Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = NetworkAvgResult> + Send>> {
     Box::pin(async move {
         let wrapped_network = IpNetwork::V4(network);
 

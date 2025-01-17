@@ -115,7 +115,7 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
             Err(_) => panic!("Failed to unwrap arc"),
         };
 
-        if query_results.len() > 0 {
+        if !query_results.is_empty() {
             // Create new records
             let new_addresses = query_results
                 .into_iter()
@@ -128,15 +128,9 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                         country,
                         online,
                     } => {
-                        let top_rir_id = match top_rir {
-                            Some(top_rir) => Some(top_rir.id().to_string()),
-                            None => None,
-                        };
+                        let top_rir_id = top_rir.map(|top_rir| top_rir.id().to_string());
 
-                        let rir_id = match rir {
-                            Some(rir) => Some(rir.id().to_string()),
-                            None => None,
-                        };
+                        let rir_id = rir.map(|rir| rir.id().to_string());
 
                         let mut routed = false;
                         let autsys_id = match autsys {
@@ -166,8 +160,7 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
             // Check which Autsyses are already in our database
             let new_autsyses = new_addresses
                 .iter()
-                .filter(|x| x.autsys_id.is_some())
-                .map(|x| x.autsys_id.unwrap())
+                .filter_map(|x| x.autsys_id)
                 .collect::<HashSet<i64>>();
 
             let autsyses_in_db = HashSet::<_>::from_iter(

@@ -25,7 +25,7 @@ impl Diglett {
             if let Some(diglett_address) = diglett_settings.address.as_ref() {
                 info!("diglett.address set, trying to connect...");
 
-                match url::Url::parse(&diglett_address) {
+                match url::Url::parse(diglett_address) {
                     Ok(diglett_url) => match diglett_client.get(diglett_url.clone()).send().await {
                         Ok(_) => {
                             info!("Successfully connected to the configured diglett instance!");

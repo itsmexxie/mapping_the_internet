@@ -80,7 +80,7 @@ impl Display for RirAllocationEntry {
             "address: {}, mask: {}, rir: {}",
             self.cidr.prefix,
             self.cidr.mask,
-            self.rir.to_string()
+            self.rir
         ))
     }
 }
