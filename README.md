@@ -1,4 +1,10 @@
 # Mapping the Internet
+## Running
+1. Setup a PostgreSQL database, accessible by all services which need it (Pokedex, Pidgeotto, Cubone).
+2. Create database accounts for the units.
+3. Run a Pokedex unit to authenticate and register units.
+4. Base minimum is running one Pidgeotto unit, one Pidgey unit and one Diglett unit. These need to communicate together, so either run them on the same server or make them publically available. You also need to generate an RSA key pair for the JWT signing. When exposing the units to the public, it is recommended to keep the Diglett API behind an auth gateway (setting api.auth to true) and providing the public JWT key.
+
 ## Services
 Here is the full list of services and what they do:
 
