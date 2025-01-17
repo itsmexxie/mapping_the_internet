@@ -1,0 +1,24 @@
+[api]
+# port =			# Specifies the port on which the API will listen
+# auth = false      # Whether to hide the API behind an auth middleware. Defaults to false.
+
+[database]
+# hostname = 		# The hostname used when connecting to the database.
+# username = 		# The username used when connecting to the database.
+# password = 		# The password used when connecting to the database.
+# database = 		# The target database used when connecting to the database.
+
+[pokedex]
+# address =			# The address used when connecting to a Pokedex instance.
+
+[settings.scanner]
+# batch =           # The number of addresses which are queried at one time when scanning for missing or stale records. Defaults to 1024.
+# max_tasks =       # Maximum number of active parallel adress scanning tasks
+# stale =           # Number of days for which an address has to be old for it to be considered stale. Defaults to 30.
+# start =           # Starting address of the scanner. Defaults to 0.0.0.0
+
+[unit]
+# username =		# The username of the unid, used when logging into Pokedex.
+# password =		# The password of the unit, used when logging into Pokedex.
+# address =			# The address of the unit, used when logging into Pokedex. Optional.
+# announce_port =	# Whether to announce the api.port to Pokedex database. Only specify when the unit is not reachable on port 80 or 443. Defaults to false.

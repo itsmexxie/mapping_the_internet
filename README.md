@@ -1,9 +1,9 @@
 # Mapping the Internet
 ## Running
 1. Setup a PostgreSQL database, accessible by all services which need it (Pokedex, Pidgeotto, Cubone).
-2. Create database accounts for the units.
-3. Run a Pokedex unit to authenticate and register units.
-4. Base minimum is running one Pidgeotto unit, one Pidgey unit and one Diglett unit. These need to communicate together, so either run them on the same server or make them publically available. You also need to generate an RSA key pair for the JWT signing. When exposing the units to the public, it is recommended to keep the Diglett API behind an auth gateway (setting api.auth to true) and providing the public JWT key.
+2. Create [database accounts](https://www.postgresql.org/docs/current/sql-createrole.html) for the units. Make sure to grant read/write access to the appropriate tables. The list of the tables with which the service communicates is listed in the service's README, together with the required permissions (select/insert/update/delete).
+3. Run a Pokedex unit to authenticate and register units. You need to generate an RSA key pair and save it in the PEM format so that Pokedex can sign the generated JWT.
+4. Base minimum is running one Pidgeotto unit, one Pidgey unit and one Diglett unit. These need to communicate together, so either run them on the same server or make them publically available. When exposing the units to the public, it is recommended to keep the Diglett API behind an auth gateway (setting api.auth to true, which is also the default).
 
 ## Services
 Here is the full list of services and what they do:
@@ -48,7 +48,6 @@ An IPv4 address can be in one of the following allocation states:
 
 ## TODO
 - [ ] (Diglett) implement automatic downloads of asn prefixes file with cron
-- [ ] (Pidgey) Pidgeotto service discovery via Pokedex
 - [ ] (Pidgeotto) Implement job queue and rework the scanning to progresivelly scan and add to queue
 - [ ] (Pidgeotto) Implement stale address records via updated_at timestamps
 - [ ] (Pidgey) Return the 500 error when Diglett responds with a 500 error
