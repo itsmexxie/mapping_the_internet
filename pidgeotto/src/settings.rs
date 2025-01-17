@@ -10,12 +10,15 @@ pub struct Settings {
     pub unit: SettingsUnit,
 }
 
+// Scanner settings (documented via /config/config.toml)
 #[derive(Debug, Deserialize)]
 pub struct SettingsScanner {
     #[serde(default = "_default_scanner_batch")]
     pub batch: u32,
     #[serde(default = "_default_scanner_max_tasks")]
     pub max_tasks: usize,
+    #[serde(default = "_default_scanner_stale")]
+    pub stale: i64,
     #[serde(default = "_default_scanner_start")]
     pub start: String,
 }
@@ -26,6 +29,10 @@ const fn _default_scanner_batch() -> u32 {
 
 const fn _default_scanner_max_tasks() -> usize {
     512
+}
+
+const fn _default_scanner_stale() -> i64 {
+    30
 }
 
 fn _default_scanner_start() -> String {

@@ -1,3 +1,4 @@
+use chrono::Utc;
 use ipnetwork::{IpNetwork, Ipv4Network};
 use mtilib::db::models::NewAddress;
 use mtilib::db::DbPool;
@@ -14,7 +15,9 @@ use uuid::Uuid;
 use crate::pidgey::{Pidgey, PidgeyUnitRequest};
 use crate::settings::Settings;
 
+// Main entry point of Pidgeotto
 pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) {
+    // Define the maximum number of tasks allowed to be active in parallel
     let task_permits = Arc::new(Semaphore::new(settings.scanner.max_tasks));
 
     info!(
@@ -23,86 +26,99 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
         task_permits.available_permits()
     );
 
-    // Query the database for records in that range
-    // Query pidgeys for the missing records
-    // Write to database
     let mut curr_address = Ipv4Addr::from_str(&settings.scanner.start)
         .unwrap()
         .to_bits();
 
     loop {
-        // Calculate current range for query
-        let mut addresses_scanning = Vec::new();
-        for i in curr_address..curr_address + settings.scanner.batch {
-            addresses_scanning.push(IpNetwork::V4(
+        // Calculate the range for the current batch
+        let mut addresses_scanning = HashSet::new();
+        let scanning_range = curr_address
+            ..=curr_address
+                .checked_add(settings.scanner.batch - 1)
+                .unwrap_or(u32::MAX);
+
+        debug!(
+            "Trying range {} .. {}",
+            Ipv4Addr::from_bits(*scanning_range.start()),
+            Ipv4Addr::from_bits(*scanning_range.end())
+        );
+
+        for i in scanning_range {
+            addresses_scanning.insert(IpNetwork::V4(
                 Ipv4Network::new(Ipv4Addr::from_bits(i), 32).unwrap(),
             ));
         }
 
-        debug!(
-            "Trying range {:?} .. {:?}",
-            addresses_scanning[0],
-            addresses_scanning.last().unwrap()
-        );
-
-        // Check which addresses are already in our database
-        let addresses_in_db = sqlx::query_scalar::<_, IpNetwork>(
-            r#"
-            SELECT id
+        // Get address records from our database which are in our range
+        let addresses_in_db: HashMap<IpNetwork, chrono::DateTime<Utc>> =
+            sqlx::query_as::<_, (IpNetwork, chrono::DateTime<Utc>)>(
+                r#"
+            SELECT id, updated_at
             FROM "Addresses"
             WHERE id = ANY($1)
             "#,
-        )
-        .bind(addresses_scanning.clone())
-        .fetch_all(&mut *db_pool.acquire().await.unwrap())
-        .await
-        .unwrap();
+            )
+            .bind(addresses_scanning.iter().collect::<Vec<_>>())
+            .fetch_all(&mut *db_pool.acquire().await.unwrap())
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
 
         let mut address_tasks = Vec::new();
         let query_results = Arc::new(Mutex::new(HashMap::new()));
 
         for address in addresses_scanning {
-            if !addresses_in_db.contains(&address) {
-                let cloned_task_permits = task_permits.clone();
-                let cloned_pidgey = pidgey.clone();
-                let cloned_query_results = query_results.clone();
-                address_tasks.push(tokio::spawn(async move {
-                    loop {
-                        let _permit = cloned_task_permits.acquire().await.unwrap();
-                        let unit = cloned_pidgey.get_unit().await;
-
-                        let (job_tx, job_rx) =
-                            tokio::sync::oneshot::channel::<PidgeyCommandResponsePayload>();
-
-                        let job_uuid = Uuid::new_v4();
-                        let ipaddr = match address.ip() {
-                            std::net::IpAddr::V4(ipv4_addr) => ipv4_addr,
-                            std::net::IpAddr::V6(_) => panic!("This should never happen"),
-                        };
-
-                        unit.tx
-                            .send(PidgeyUnitRequest {
-                                command: PidgeyCommand {
-                                    id: job_uuid,
-                                    payload: PidgeyCommandPayload::Query { address: ipaddr },
-                                },
-                                response: job_tx,
-                            })
-                            .await
-                            .unwrap();
-
-                        match job_rx.await {
-                            Ok(response) => {
-                                cloned_query_results.lock().await.insert(address, response);
-                                break;
-                            }
-                            Err(_) => {
-                                error!("Error while querying address {}, retrying...", address)
-                            }
-                        };
-                    }
-                }));
+            // Check if the record is missing or stale
+            if addresses_in_db.contains_key(&address)
+                && (Utc::now() - addresses_in_db.get(&address).unwrap()).num_days()
+                    < settings.scanner.stale
+            {
+                continue;
             }
+
+            let cloned_task_permits = task_permits.clone();
+            let cloned_pidgey = pidgey.clone();
+            let cloned_query_results = query_results.clone();
+            address_tasks.push(tokio::spawn(async move {
+                loop {
+                    // Get permission to run
+                    let _permit = cloned_task_permits.acquire().await.unwrap();
+                    // Get a random Pidgey unit
+                    let unit = cloned_pidgey.get_unit().await;
+
+                    let (job_tx, job_rx) =
+                        tokio::sync::oneshot::channel::<PidgeyCommandResponsePayload>();
+
+                    let job_uuid = Uuid::new_v4();
+                    let ipaddr = match address.ip() {
+                        std::net::IpAddr::V4(ipv4_addr) => ipv4_addr,
+                        std::net::IpAddr::V6(_) => panic!("This should never happen"),
+                    };
+
+                    unit.tx
+                        .send(PidgeyUnitRequest {
+                            command: PidgeyCommand {
+                                id: job_uuid,
+                                payload: PidgeyCommandPayload::Query { address: ipaddr },
+                            },
+                            response: job_tx,
+                        })
+                        .await
+                        .unwrap();
+
+                    match job_rx.await {
+                        Ok(response) => {
+                            cloned_query_results.lock().await.insert(address, response);
+                            break;
+                        }
+                        Err(_) => {
+                            error!("Error while querying address {}, retrying...", address)
+                        }
+                    };
+                }
+            }));
         }
 
         // Wait for all queries to finish
@@ -157,7 +173,7 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                 })
                 .collect::<Vec<_>>();
 
-            // Check which Autsyses are already in our database
+            // Get autsyses that are already in our database and in the currently scanned batch
             let new_autsyses = new_addresses
                 .iter()
                 .filter_map(|x| x.autsys_id)
@@ -178,6 +194,7 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                 .into_iter(),
             );
 
+            // Create missing autsyses
             sqlx::query(
                 r#"
                     INSERT INTO "Autsyses" (id)
@@ -190,6 +207,8 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
             .await
             .unwrap();
 
+            // Create new address records
+            // We can be sure that these are not duplicates because we checked that before
             let mut addresses_qb = QueryBuilder::new(
                 r#"INSERT INTO "Addresses" (id, allocation_state_id, allocation_state_comment, routed, online, top_rir_id, rir_id, autsys_id, country)"#,
             );
@@ -213,6 +232,9 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                 .unwrap();
         }
 
-        curr_address += settings.scanner.batch;
+        match curr_address.checked_add(settings.scanner.batch) {
+            Some(result) => curr_address = result,
+            None => curr_address = 0,
+        }
     }
 }
