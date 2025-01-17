@@ -14,3 +14,11 @@ docker run --rm -v ./config.toml:/config.toml -p 80:{{ API_PORT }} {{ IMAGE_ID }
 ```
 
 The API_PORT in the docker run command must be the same one as the one you specified in the config.
+
+## Database
+The unit needs access to the following tables with the following permissions:
+- AddressAllocationStates (SELECT)
+- AddressMaps (*)
+- Addresses (SELECT)
+- Autsyses (SELECT)
+- Rirs (SELECT)

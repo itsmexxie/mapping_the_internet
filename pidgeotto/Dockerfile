@@ -11,6 +11,7 @@ FROM rust:latest AS builder
 RUN apt update
 RUN apt install libpq5 -y
 
+# Build pidgeotto
 WORKDIR /pidgeotto
 COPY ./pidgeotto/src ./src
 COPY ./pidgeotto/Cargo.toml .
@@ -48,5 +49,6 @@ COPY --from=builder /usr/lib/${ARCH}-linux-gnu/liblber-2.5.so* /usr/lib/${ARCH}-
 
 # Copy our build
 COPY --from=builder /pidgeotto/target/release/pidgeotto .
+COPY ./pidgeotto/sprite.txt .
 
 CMD ["/pidgeotto"]

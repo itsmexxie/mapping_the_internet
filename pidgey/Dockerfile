@@ -8,6 +8,7 @@
 #############
 FROM rust:latest AS builder
 
+# Build pidgey
 WORKDIR /pidgey
 COPY ./pidgey/src ./src
 COPY ./pidgey/Cargo.toml .
@@ -23,5 +24,6 @@ FROM gcr.io/distroless/cc
 
 # Copy our build
 COPY --from=builder /pidgey/target/release/pidgey .
+COPY ./pidgey/sprite.txt .
 
 CMD ["/pidgey"]

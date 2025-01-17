@@ -14,3 +14,8 @@ docker run --rm -v ./jwt.key.pub:/jwt.key.pub -v ./jwt.key:/jwt.key -v ./config.
 ```
 
 The API_PORT in the docker run command must be the same one as the one you specified in the config.
+
+## Database
+The unit needs access to the following tables with the following permissions:
+- ServiceUnits (*)
+- Services (*)
