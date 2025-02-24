@@ -1,5 +1,5 @@
 <script lang="ts">
-	import "../style/main.scss";
+    import "../style/main.scss";
 
 	let { children } = $props();
 </script>

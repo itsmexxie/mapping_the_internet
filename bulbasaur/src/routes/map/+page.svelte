@@ -2,7 +2,7 @@
 	import * as hilbert from 'hilbert-curve';
 	import map from '$lib/map';
 	import ip from '$lib/ip';
-	import { PUBLIC_API_URL } from '$env/static/public';
+	import { env } from '$env/dynamic/public';
 
     let octets = $state([1, 1, 1]);
 	let address = $state(0);
@@ -36,7 +36,7 @@
 			let new_address = start + (i << levelToPrefix(currentLevel));
 			let new_octets = ip.binaryToOctet(new_address);
 			fetch(
-				`${PUBLIC_API_URL}/map/${new_octets[0]}.${new_octets[1]}.${new_octets[2]}.${new_octets[3]}/32`
+				`${env.PUBLIC_API_URL}/map/${new_octets[0]}.${new_octets[1]}.${new_octets[2]}.${new_octets[3]}/32`
 			).then((body) => {
 				body.json().then((res) => {
 					_data.push({ prefix: new_octets[currentLevel], data: res });

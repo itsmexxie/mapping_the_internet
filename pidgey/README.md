@@ -10,7 +10,7 @@ A service which queries data about an IP address using multiple sources
 ### Docker
 Build with `docker build -f pidgey/Dockerfile .` (must be ran from the root of this repo!). Than run the resulting image with the following command:
 ```
-docker run --rm -v ./jwt.key.pub:/jwt.key.pub -v ./config.toml:/config.toml -p 7020:7020 {{ IMAGE_ID }}
+docker run --rm -v ./jwt.key.pub:/jwt.key.pub -v ./config.toml:/config.toml -p {{ CUSTOM }}:{{ API_PORT }} {{ IMAGE_ID }}
 ```
 
 The API_PORT in the docker run command must be the same one as the one you specified in the config.

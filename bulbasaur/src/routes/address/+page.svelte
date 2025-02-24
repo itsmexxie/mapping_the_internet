@@ -1,6 +1,6 @@
 <script lang="ts">
 	import countries from "$lib/countries";
-	import {PUBLIC_API_URL} from "$env/static/public";
+	import { env } from "$env/dynamic/public";
 
 	interface Address {
 		id: string;
@@ -47,7 +47,7 @@
 	async function updateAddressInfo() {
 		if (/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/.test(addressValue)) {
 			try {
-				let res = await fetch(`${PUBLIC_API_URL}/address/${addressValue}`);
+				let res = await fetch(`${env.PUBLIC_API_URL}/address/${addressValue}`);
                 switch (res.status) {
                     case 200:
                         address = (await res.json())[0];
