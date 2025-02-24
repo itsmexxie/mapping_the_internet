@@ -20,11 +20,11 @@ RUN yarn build
 #################
 ## Final image ##
 #################
-FROM node:latest
+FROM gcr.io/distroless/nodejs22:latest
 
 WORKDIR /bulbasaur
 COPY --from=build /bulbasaur/build ./build
 COPY --from=build /bulbasaur/node_modules ./node_modules
 COPY --from=build /bulbasaur/package.json .
 
-CMD ["node", "--env-file=../.env", "build"]
+CMD ["--env-file=../.env", "build"]
