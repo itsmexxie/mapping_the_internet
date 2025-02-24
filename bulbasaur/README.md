@@ -22,3 +22,4 @@ The API_PORT in the docker run command must be the same one as the port the appl
 all cases be `3000`.
 
 ### Public instance
+A public instance of the application can be found [here](https://mti.itsmexxie.net/).
