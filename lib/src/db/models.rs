@@ -19,7 +19,7 @@ pub struct Address {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NewAddress {
     pub id: IpNetwork,

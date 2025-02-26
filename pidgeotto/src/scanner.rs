@@ -173,6 +173,8 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                 })
                 .collect::<Vec<_>>();
 
+            let new_addresses_ips = new_addresses.iter().map(|x| x.id).collect::<Vec<_>>();
+
             // Get autsyses that are already in our database and in the currently scanned batch
             let new_autsyses = new_addresses
                 .iter()
@@ -203,6 +205,31 @@ pub async fn run(settings: Arc<Settings>, db_pool: DbPool, pidgey: Arc<Pidgey>) 
                     "#,
             )
             .bind(new_autsyses.difference(&autsyses_in_db).collect::<Vec<_>>())
+            .execute(&mut *db_pool.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+            // Remove cached maps which cover updated addresses
+            sqlx::query(
+                r#"
+                    DELETE FROM "AddressMaps"
+                    WHERE id >> ANY($1::inet[])
+                    "#,
+            )
+            .bind(&new_addresses_ips)
+            .execute(&mut *db_pool.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+            // Remove duplicate address records
+            // This should happen only if we are removing stale records
+            sqlx::query(
+                r#"
+                DELETE FROM "Addresses"
+                WHERE id = ANY($1)
+            "#,
+            )
+            .bind(&new_addresses_ips)
             .execute(&mut *db_pool.acquire().await.unwrap())
             .await
             .unwrap();
