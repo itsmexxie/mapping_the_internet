@@ -7,12 +7,16 @@
     let octets = $state([1, 1, 1]);
 	let address = $state(0);
 	let currentLevel = $state(3);
-	let zoomLevel = $state(3);
+	let zoomLevel = 3;
 
-	let data: { allocation_state: string; routed: boolean; online: boolean }[] = $state([]);
+	let data: { prefix: string, allocation_state: string; routed: boolean; online: boolean }[] = $state([]);
 
-	function levelToPrefix(level: number): number {
-		return [8, 16, 24, 32][level];
+    function levelToPrefix(level: number) {
+        return [8, 16, 24, 32][level];
+    }
+
+	function levelToPrefixShift(level: number): number {
+		return [24, 16, 8, 0][level];
 	}
 
     function updateCurrentLevel() {
@@ -29,21 +33,21 @@
 
 	function fetchData() {
 		data = [];
-		let _data: { prefix: number; data: any }[] = [];
+		let _data: { levelPrefix: number; data: any }[] = [];
 
 		let start = address;
 		for (let i = 0; i < 256; i++) {
-			let new_address = start + (i << levelToPrefix(currentLevel));
+            let new_address = start + (i << levelToPrefixShift(currentLevel));
 			let new_octets = ip.binaryToOctet(new_address);
 			fetch(
 				`${env.PUBLIC_API_URL}/map/${new_octets[0]}.${new_octets[1]}.${new_octets[2]}.${new_octets[3]}/32`
 			).then((body) => {
 				body.json().then((res) => {
-					_data.push({ prefix: new_octets[currentLevel], data: res });
+					_data.push({ levelPrefix: new_octets[currentLevel], data: Object.assign({ prefix: ip.prettyOctet(new_octets) }, res) });
 
 					if (_data.length >= 256) {
 						_data.sort((a, b) => {
-							return a.prefix - b.prefix;
+							return a.levelPrefix - b.levelPrefix;
 						});
 						data = _data.map((x) => x.data);
 					}
@@ -107,13 +111,13 @@
 				type="range"
 				id="currentLevel"
 				class="form-range"
-				min="0"
+				min="2"
 				max="3"
 				bind:value={currentLevel}
 				oninput={updateCurrentLevel}
 			/>
 		</div>
-		<div class="mb-3">
+		<!-- <div class="mb-3">
 			<div>
 				<label for="zoomLevel" class="form-label">Zoom level</label>
 				<span class="ms-3">/{levelToPrefix(zoomLevel)}</span>
@@ -127,7 +131,7 @@
 				bind:value={zoomLevel}
 				disabled={currentLevel > 2}
 			/>
-		</div>
+		</div> -->
 		<div>
 			<button
 				class="btn btn-primary"
@@ -152,6 +156,7 @@
 								currAddress.online
 							)
 						].value}
+                        title={currAddress.prefix}
 					></div>
 				{/each}
 			{/each}
